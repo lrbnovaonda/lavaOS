@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>LavaOS — Sistema de Lavagem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ── CONFIGURE AQUI ──────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "COLE_AQUI",
+      authDomain:        "COLE_AQUI",
+      projectId:         "COLE_AQUI",
+      storageBucket:     "COLE_AQUI",
+      messagingSenderId: "COLE_AQUI",
+      appId:             "COLE_AQUI"
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    window.__db  = db;
+    window.__fns = { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp };
+    window.dispatchEvent(new Event("firebase-ready"));
+  </script>
+
+  <style>
+    /* ─── Reset & Tokens ──────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #181c25;
+      --card:     #1e2330;
+      --border:   #2a3040;
+      --accent:   #00e5a0;
+      --accent2:  #00b8ff;
+      --danger:   #ff4c6a;
+      --warn:     #ffb800;
+      --text:     #e8eaf0;
+      --muted:    #6b7280;
+      --font-h:   'Barlow Condensed', sans-serif;
+      --font-b:   'Barlow', sans-serif;
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: var(--font-b); font-size: 16px; overflow-x: hidden;
+    }
+
+    /* ─── Layout ───────────────────────────────────────── */
+    #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--accent);
+      padding: 12px 20px;
+      display: flex; align-items: center; gap: 14px;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .logo-mark {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--accent); display: grid; place-items: center;
+      font-family: var(--font-h); font-size: 22px; font-weight: 900;
+      color: #0f1117; line-height: 1;
+    }
+    .logo-text { font-family: var(--font-h); font-size: 26px; font-weight: 800; letter-spacing: .5px; }
+    .logo-text span { color: var(--accent); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    #db-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+    #db-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+    #db-dot.online { background: var(--accent); }
+
+    /* ─── Tabs ─────────────────────────────────────────── */
+    nav.tabs {
+      display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    nav.tabs button {
+      flex: 1; min-width: 110px; padding: 14px 10px;
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-family: var(--font-h); font-size: 15px; font-weight: 700; letter-spacing: .5px;
+      text-transform: uppercase; border-bottom: 3px solid transparent;
+      transition: color .2s, border-color .2s; white-space: nowrap;
+    }
+    nav.tabs button.active { color: var(--accent); border-color: var(--accent); }
+
+    /* ─── Views ────────────────────────────────────────── */
+    .view { display: none; flex: 1; padding: 20px; max-width: 640px; margin: 0 auto; width: 100%; }
+    .view.active { display: block; }
+
+    /* ─── Cards ────────────────────────────────────────── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-family: var(--font-h); font-size: 13px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ─── Inputs ───────────────────────────────────────── */
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+    input, select, textarea {
+      width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 10px; color: var(--text); font-family: var(--font-b);
+      font-size: 16px; padding: 12px 14px; outline: none;
+      transition: border-color .2s;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    input.placa-input {
+      font-family: var(--font-h); font-size: 36px; font-weight: 900;
+      letter-spacing: 5px; text-align: center; text-transform: uppercase;
+      color: var(--accent); padding: 14px;
+    }
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .input-group { margin-bottom: 16px; }
+
+    /* ─── Buttons ──────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; border-radius: 10px; cursor: pointer; font-family: var(--font-h);
+      font-size: 17px; font-weight: 800; letter-spacing: .5px;
+      padding: 14px 22px; transition: transform .1s, opacity .2s;
+      text-transform: uppercase; width: 100%;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #0f1117; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+    .btn-danger  { background: var(--danger); color: #fff; }
+    .btn-print   { background: #1e2330; color: var(--accent2); border: 1.5px solid var(--accent2); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-sm { padding: 9px 14px; font-size: 14px; width: auto; }
+
+    /* ─── Camera section ───────────────────────────────── */
+    #cam-container {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      border-radius: 12px; overflow: hidden; background: #000;
+      border: 2px solid var(--border);
+    }
+    #cam-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #cam-overlay {
+      position: absolute; inset: 0; pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cam-frame {
+      width: 75%; height: 60%; border: 3px solid var(--accent);
+      border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+      animation: pulse-frame 2s ease-in-out infinite;
+    }
+    @keyframes pulse-frame {
+      0%,100% { border-color: var(--accent); }
+      50%      { border-color: var(--accent2); }
+    }
+    #cam-hint { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+    /* ─── Tipo de lavagem chips ─────────────────────────── */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .chip {
+      padding: 9px 16px; border-radius: 30px; font-family: var(--font-h);
+      font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .3px;
+      border: 2px solid var(--border); background: var(--surface); color: var(--muted);
+      transition: all .15s;
+    }
+    .chip.selected { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+
+    /* ─── Valor display ─────────────────────────────────── */
+    .valor-display {
+      background: var(--surface); border: 2px solid var(--border);
+      border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 4px;
+    }
+    .valor-display .prefix { font-size: 20px; color: var(--muted); font-family: var(--font-h); }
+    .valor-display input {
+      border: none; background: none; font-family: var(--font-h);
+      font-size: 48px; font-weight: 900; color: var(--accent);
+      text-align: center; width: 100%; padding: 4px 0;
+    }
+    .valor-display input:focus { border: none; outline: none; }
+
+    /* ─── OS List ───────────────────────────────────────── */
+    .os-item {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; transition: border-color .2s;
+    }
+    .os-item:hover { border-color: var(--accent); }
+    .os-placa-badge {
+      font-family: var(--font-h); font-size: 20px; font-weight: 900;
+      color: var(--accent); letter-spacing: 2px; min-width: 100px;
+    }
+    .os-info { flex: 1; }
+    .os-tipo { font-size: 14px; color: var(--muted); }
+    .os-valor { font-family: var(--font-h); font-size: 22px; font-weight: 800; }
+    .os-hora  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .os-status {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px;
+      font-family: var(--font-h); font-weight: 700; letter-spacing: .5px;
+    }
+    .os-status.aguardando { background: rgba(255,184,0,.15); color: var(--warn); }
+    .os-status.concluido  { background: rgba(0,229,160,.15); color: var(--accent); }
+
+    /* ─── Ticket Print ──────────────────────────────────── */
+    #ticket-modal {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.85); align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #ticket-modal.open { display: flex; }
+    #ticket-wrap {
+      background: #fff; color: #000; border-radius: 8px;
+      width: 100%; max-width: 320px; padding: 0; overflow: hidden;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* ─── Toast ─────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--accent); color: #0f1117; padding: 12px 24px;
+      border-radius: 30px; font-family: var(--font-h); font-weight: 700; font-size: 15px;
+      z-index: 200; transition: transform .3s ease;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ─── Empty State ───────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+    }
+    .empty-state .icon { font-size: 56px; margin-bottom: 12px; opacity: .5; }
+    .empty-state p { font-size: 15px; }
+
+    /* ─── Section divider ───────────────────────────────── */
+    .section-label {
+      font-family: var(--font-h); font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+      margin: 20px 0 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ─── Config list ───────────────────────────────────── */
+    .config-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .config-item:last-child { border-bottom: none; }
+    .config-item .label { font-size: 15px; }
+    .config-item .sub   { font-size: 12px; color: var(--muted); }
+    .config-item .actions { display: flex; gap: 8px; }
+
+    /* ─── Print styles ──────────────────────────────────── */
+    @media print {
+      body > *:not(#ticket-modal) { display: none !important; }
+      #ticket-modal { display: flex !important; position: static; background: none; padding: 0; }
+      #ticket-wrap  { box-shadow: none; max-width: 100%; border-radius: 0; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo-mark">L</div>
+    <div class="logo-text">Lava<span>OS</span></div>
+    <div class="header-right">
+      <div id="db-status"><div id="db-dot"></div> <span id="db-label">Conectando…</span></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" onclick="setTab('nova')">＋ Nova OS</button>
+    <button onclick="setTab('fila')">📋 Fila</button>
+    <button onclick="setTab('config')">⚙ Config</button>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       VIEW: NOVA OS
+  ════════════════════════════════════════════════════ -->
+  <div id="view-nova" class="view active">
+
+    <!-- Câmera / Placa -->
+    <div class="card">
+      <div class="card-title">📷 Leitura de Placa</div>
+      <div id="cam-container" style="display:none">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <div id="cam-overlay"><div class="cam-frame"></div></div>
+      </div>
+      <p id="cam-hint" style="display:none">Aponte para a placa do veículo</p>
+
+      <button class="btn btn-secondary" id="btn-cam" onclick="toggleCamera()" style="margin-bottom:12px">
+        📷 Abrir câmera
+      </button>
+
+      <div class="input-group">
+        <label>Placa</label>
+        <input id="placa" class="placa-input" type="text" maxlength="8"
+               placeholder="ABC1234" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')" />
+      </div>
+    </div>
+
+    <!-- Tipo de Lavagem -->
+    <div class="card">
+      <div class="card-title">🚿 Tipo de Lavagem</div>
+      <div class="chips" id="chips-container"></div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <input id="novo-tipo" type="text" placeholder="Adicionar tipo…" style="flex:1" />
+        <button class="btn btn-secondary btn-sm" onclick="adicionarTipo()">＋</button>
+      </div>
+    </div>
+
+    <!-- Valor -->
+    <div class="card">
+      <div class="card-title">💰 Valor</div>
+      <div class="valor-display">
+        <div class="prefix">R$</div>
+        <input id="valor" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01" />
+      </div>
+
+      <!-- Teclado rápido de valores -->
+      <div class="chips" id="valores-rapidos" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Obs -->
+    <div class="card">
+      <div class="card-title">📝 Observações (opcional)</div>
+      <textarea id="obs" rows="2" placeholder="Ex: Carro sujo, interior…" style="resize:none"></textarea>
+    </div>
+
+    <button class="btn btn-primary" onclick="abrirOS()" id="btn-abrir">
+      ✅ Abrir OS e Imprimir Ticket
+    </button>
+    <div style="height:30px"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       VIEW: FILA
+  ════════════════════════════════════════════════════ -->
+  <div id="view-fila" class="view">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <h2 style="font-family:var(--font-h); font-size:24px; font-weight:800;">Fila do Dia</h2>
+      <button class="btn btn-secondary btn-sm" onclick="carregarFila()">↺ Atualizar</button>
+    </div>
+    <div id="fila-list">
+      <div class="empty-state"><div class="icon">🚗</div><p>Nenhuma OS hoje</p></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       VIEW: CONFIG
+  ════════════════════════════════════════════════════ -->
+  <div id="view-config" class="view">
+    <div class="card">
+      <div class="card-title">🏪 Estabelecimento</div>
+      <div class="input-group">
+        <label>Nome do lava-rápido</label>
+        <input id="cfg-nome" type="text" placeholder="Ex: Lava Rápido do João" />
+      </div>
+      <div class="input-group">
+        <label>Endereço</label>
+        <input id="cfg-end" type="text" placeholder="Rua, nº — Bairro" />
+      </div>
+      <div class="input-group">
+        <label>Telefone / WhatsApp</label>
+        <input id="cfg-tel" type="tel" placeholder="(11) 99999-9999" />
+      </div>
+      <button class="btn btn-primary" onclick="salvarConfig()">💾 Salvar</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔑 Firebase</div>
+      <div class="input-group">
+        <label>Status da conexão</label>
+        <div style="display:flex; align-items:center; gap:8px; padding:10px 0;">
+          <div id="db-dot2" style="width:10px;height:10px;border-radius:50%;background:var(--warn)"></div>
+          <span id="db-label2">Aguardando…</span>
+        </div>
+      </div>
+      <p style="font-size:13px; color:var(--muted); line-height:1.6;">
+        Para conectar ao Firebase, edite as variáveis <code style="color:var(--accent)">firebaseConfig</code>
+        no topo do arquivo <code>index.html</code> com os dados do seu projeto no
+        <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent2)">Firebase Console</a>.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💡 Tipos de lavagem cadastrados</div>
+      <div id="tipos-lista"></div>
+      <button class="btn btn-secondary" style="margin-top:12px" onclick="setTab('nova')">
+        ＋ Gerenciar na tela Nova OS
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TICKET MODAL
+════════════════════════════════════════════════════ -->
+<div id="ticket-modal">
+  <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;">
+    <div id="ticket-wrap">
+      <!-- preenchido por JS -->
+    </div>
+    <button class="btn btn-print no-print" onclick="imprimirTicket()">🖨 Imprimir / Salvar PDF</button>
+    <button class="btn btn-secondary no-print" onclick="fecharTicket()">✕ Fechar</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let db, fns;
+let tiposLavagem = JSON.parse(localStorage.getItem('tipos') || '["Simples","Completa","Polimento","Higienização","Enceramento","Externo"]');
+let config       = JSON.parse(localStorage.getItem('cfg')   || '{"nome":"Lava Rápido","end":"","tel":""}');
+let currentOS    = null;
+let camStream    = null;
+let camActive    = false;
+let ocrInterval  = null;
+let fila         = [];
+
+// ═══════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('firebase-ready', async () => {
+  db  = window.__db;
+  fns = window.__fns;
+  try {
+    // ping — se der erro, a config está errada
+    await fns.getDocs(fns.query(fns.collection(db, 'ordens'), fns.orderBy('criadoEm','desc'), fns.limit(1)));
+    setDbStatus(true);
+    carregarFila();
+  } catch(e) {
+    setDbStatus(false);
+    console.warn('Firebase:', e.message);
+  }
+});
+
+function setDbStatus(ok) {
+  ['db-dot','db-dot2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.background = ok ? 'var(--accent)' : 'var(--danger)'; }
+  });
+  ['db-label','db-label2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = ok ? 'Online ✓' : 'Config. necessária';
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════
+function setTab(tab) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  const idx = {nova:0,fila:1,config:2}[tab];
+  document.querySelectorAll('nav.tabs button')[idx].classList.add('active');
+  if (tab === 'fila')   carregarFila();
+  if (tab === 'config') carregarConfig();
+}
+
+// ═══════════════════════════════════════════════════
+// CÂMERA & OCR
+// ═══════════════════════════════════════════════════
+async function toggleCamera() {
+  if (camActive) { stopCamera(); return; }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const video = document.getElementById('cam-video');
+    video.srcObject = camStream;
+    document.getElementById('cam-container').style.display = 'block';
+    document.getElementById('cam-hint').style.display = 'block';
+    document.getElementById('btn-cam').textContent = '■ Fechar câmera';
+    camActive = true;
+    startOCR();
+  } catch(e) {
+    toast('Câmera não disponível');
+  }
+}
+
+function stopCamera() {
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  document.getElementById('cam-container').style.display = 'none';
+  document.getElementById('cam-hint').style.display = 'none';
+  document.getElementById('btn-cam').textContent = '📷 Abrir câmera';
+  camActive = false;
+  clearInterval(ocrInterval);
+}
+
+function startOCR() {
+  // OCR leve via canvas snapshot — sem dependência externa
+  const video   = document.getElementById('cam-video');
+  const canvas  = document.createElement('canvas');
+  const ctx     = canvas.getContext('2d');
+  // Tenta usar Tesseract se disponível, senão orienta digitação manual
+  const hasTess = typeof Tesseract !== 'undefined';
+
+  ocrInterval = setInterval(async () => {
+    if (!camActive || video.readyState < 2) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+
+    if (!hasTess) return; // sem Tesseract, só câmera visual
+
+    // Recorta região central (placa)
+    const x = canvas.width  * 0.12;
+    const y = canvas.height * 0.20;
+    const w = canvas.width  * 0.76;
+    const h = canvas.height * 0.60;
+    const imgData = canvas.toDataURL('image/jpeg', .8);
+
+    try {
+      const { data: { text } } = await Tesseract.recognize(imgData, 'por', { logger: () => {} });
+      const match = text.replace(/\s/g,'').match(/[A-Z]{3}[0-9][A-Z0-9][0-9]{2}/);
+      if (match) {
+        document.getElementById('placa').value = match[0];
+        toast('Placa detectada: ' + match[0]);
+        stopCamera();
+      }
+    } catch(e) {}
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════════════
+// TIPOS DE LAVAGEM
+// ═══════════════════════════════════════════════════
+let tipoSelecionado = null;
+
+function renderChips() {
+  const cont = document.getElementById('chips-container');
+  cont.innerHTML = '';
+  tiposLavagem.forEach(t => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (t === tipoSelecionado ? ' selected' : '');
+    chip.textContent = t;
+    chip.onclick = () => { tipoSelecionado = t; renderChips(); };
+    cont.appendChild(chip);
+  });
+  renderTiposConfig();
+}
+
+function adicionarTipo() {
+  const inp = document.getElementById('novo-tipo');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!tiposLavagem.includes(val)) {
+    tiposLavagem.push(val);
+    salvarTipos();
+    renderChips();
+  }
+  inp.value = '';
+}
+
+function salvarTipos() {
+  localStorage.setItem('tipos', JSON.stringify(tiposLavagem));
+}
+
+function removerTipo(t) {
+  tiposLavagem = tiposLavagem.filter(x => x !== t);
+  if (tipoSelecionado === t) tipoSelecionado = null;
+  salvarTipos(); renderChips();
+}
+
+function renderTiposConfig() {
+  const el = document.getElementById('tipos-lista');
+  if (!el) return;
+  el.innerHTML = '';
+  tiposLavagem.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'config-item';
+    row.innerHTML = `<div><div class="label">${t}</div></div>
+      <div class="actions">
+        <button class="btn btn-secondary btn-sm" onclick="removerTipo('${t}')">🗑</button>
+      </div>`;
+    el.appendChild(row);
+  });
+}
+
+// Valores rápidos
+const valoresBase = [15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150];
+function renderValoresRapidos() {
+  const cont = document.getElementById('valores-rapidos');
+  cont.innerHTML = '';
+  valoresBase.forEach(v => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.textContent = 'R$' + v;
+    chip.onclick = () => { document.getElementById('valor').value = v; };
+    cont.appendChild(chip);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// ABRIR OS
+// ═══════════════════════════════════════════════════
+async function abrirOS() {
+  const placa = document.getElementById('placa').value.trim().toUpperCase();
+  const valor = parseFloat(document.getElementById('valor').value);
+  const obs   = document.getElementById('obs').value.trim();
+
+  if (!placa || placa.length < 7) { toast('Digite a placa!'); return; }
+  if (!tipoSelecionado) { toast('Selecione o tipo de lavagem!'); return; }
+  if (!valor || valor <= 0) { toast('Informe o valor!'); return; }
+
+  const btn = document.getElementById('btn-abrir');
+  btn.disabled = true; btn.textContent = '⏳ Salvando…';
+
+  const os = {
+    placa, tipo: tipoSelecionado, valor, obs,
+    status: 'aguardando',
+    numero: gerarNumero(),
+    criadoEm: new Date().toISOString(),
+    nomeEstab: config.nome || 'Lava Rápido',
+  };
+
+  try {
+    if (db && fns) {
+      const docRef = await fns.addDoc(fns.collection(db, 'ordens'), {
+        ...os, criadoEm: fns.serverTimestamp()
+      });
+      os.id = docRef.id;
+    }
+  } catch(e) {
+    console.warn('Firestore offline, salvando local:', e.message);
+  }
+
+  // Salva local também
+  const local = JSON.parse(localStorage.getItem('ordens_local') || '[]');
+  local.unshift({ ...os });
+  localStorage.setItem('ordens_local', JSON.stringify(local.slice(0, 200)));
+
+  currentOS = os;
+  mostrarTicket(os);
+
+  // Reset form
+  document.getElementById('placa').value = '';
+  document.getElementById('valor').value = '';
+  document.getElementById('obs').value   = '';
+  tipoSelecionado = null;
+  renderChips();
+  btn.disabled = false; btn.textContent = '✅ Abrir OS e Imprimir Ticket';
+}
+
+function gerarNumero() {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*9000)+1000)}`;
+}
+
+// ═══════════════════════════════════════════════════
+// TICKET
+// ═══════════════════════════════════════════════════
+function mostrarTicket(os) {
+  const dt = new Date(os.criadoEm);
+  const hora = dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  const data = dt.toLocaleDateString('pt-BR');
+
+  document.getElementById('ticket-wrap').innerHTML = `
+  <div style="padding:20px 18px; font-family:'Courier New',monospace; font-size:13px; line-height:1.5; color:#000;">
+
+    <!-- Cabeçalho -->
+    <div style="text-align:center; border-bottom:2px dashed #000; padding-bottom:12px; margin-bottom:12px;">
+      <div style="font-size:20px; font-weight:900; letter-spacing:2px;">${(config.nome||'LAVA RÁPIDO').toUpperCase()}</div>
+      ${config.end ? `<div style="font-size:11px;">${config.end}</div>` : ''}
+      ${config.tel ? `<div style="font-size:11px;">Tel: ${config.tel}</div>` : ''}
+    </div>
+
+    <!-- OS Number -->
+    <div style="text-align:center; margin-bottom:10px;">
+      <div style="font-size:11px; letter-spacing:1px;">ORDEM DE SERVIÇO</div>
+      <div style="font-size:15px; font-weight:700;">#${os.numero}</div>
+      <div style="font-size:11px;">${data} às ${hora}</div>
+    </div>
+
+    <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:10px 0; margin-bottom:10px;">
+      <!-- Placa destaque -->
+      <div style="text-align:center;">
+        <div style="font-size:11px; letter-spacing:1px; margin-bottom:4px;">PLACA DO VEÍCULO</div>
+        <div style="font-size:36px; font-weight:900; letter-spacing:5px; border:3px solid #000; display:inline-block; padding:4px 16px; border-radius:6px;">${os.placa}</div>
+      </div>
+    </div>
+
+    <!-- Serviço -->
+    <table style="width:100%; font-size:13px; margin-bottom:10px;">
+      <tr>
+        <td style="padding:3px 0;">Serviço</td>
+        <td style="text-align:right; font-weight:700;">${os.tipo}</td>
+      </tr>
+      ${os.obs ? `<tr><td colspan="2" style="font-size:11px; color:#444; padding:2px 0;">Obs: ${os.obs}</td></tr>` : ''}
+      <tr style="border-top:1px dashed #000;">
+        <td style="padding:6px 0; font-weight:700; font-size:15px;">TOTAL</td>
+        <td style="text-align:right; font-weight:900; font-size:22px;">R$ ${os.valor.toFixed(2).replace('.',',')}</td>
+      </tr>
+    </table>
+
+    <!-- Status -->
+    <div style="text-align:center; border:2px solid #000; padding:6px; border-radius:4px; margin-bottom:10px;">
+      <div style="font-size:11px;">STATUS</div>
+      <div style="font-size:16px; font-weight:900; letter-spacing:2px;">⏳ AGUARDANDO</div>
+    </div>
+
+    <!-- Rodapé -->
+    <div style="text-align:center; font-size:10px; color:#666; border-top:1px dashed #000; padding-top:8px;">
+      Obrigado pela preferência!<br/>
+      Gerado por LavaOS
+    </div>
+  </div>`;
+
+  document.getElementById('ticket-modal').classList.add('open');
+}
+
+function imprimirTicket() {
+  window.print();
+}
+
+function fecharTicket() {
+  document.getElementById('ticket-modal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════
+// FILA
+// ═══════════════════════════════════════════════════
+async function carregarFila() {
+  const listEl = document.getElementById('fila-list');
+  listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Carregando…</div>';
+
+  let ordens = [];
+
+  // Local first
+  const local = JSON.parse(localStorage.getItem('ordens_local') || '[]');
+  const hoje  = new Date().toDateString();
+  ordens = local.filter(o => new Date(o.criadoEm).toDateString() === hoje);
+
+  // Firebase
+  if (db && fns) {
+    try {
+      const snap = await fns.getDocs(
+        fns.query(fns.collection(db, 'ordens'), fns.orderBy('criadoEm','desc'), fns.limit(50))
+      );
+      const fbOrdens = [];
+      snap.forEach(doc => fbOrdens.push({ id: doc.id, ...doc.data() }));
+      if (fbOrdens.length) ordens = fbOrdens.filter(o => {
+        const dt = o.criadoEm?.toDate ? o.criadoEm.toDate() : new Date(o.criadoEm);
+        return dt.toDateString() === hoje;
+      });
+    } catch(e) {}
+  }
+
+  fila = ordens;
+  renderFila();
+}
+
+function renderFila() {
+  const listEl = document.getElementById('fila-list');
+  if (!fila.length) {
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">🚗</div><p>Nenhuma OS hoje</p></div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  fila.forEach(os => {
+    const dt   = os.criadoEm?.toDate ? os.criadoEm.toDate() : new Date(os.criadoEm);
+    const hora = isNaN(dt) ? '—' : dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const item = document.createElement('div');
+    item.className = 'os-item';
+    item.innerHTML = `
+      <div class="os-placa-badge">${os.placa}</div>
+      <div class="os-info">
+        <div class="os-tipo">${os.tipo}</div>
+        <div class="os-valor">R$ ${Number(os.valor).toFixed(2).replace('.',',')}</div>
+        <div class="os-hora">${hora} · #${os.numero||''}</div>
+      </div>
+      <div class="os-status ${os.status||'aguardando'}">${os.status === 'concluido' ? 'PRONTO' : 'LAVANDO'}</div>`;
+    item.onclick = () => { currentOS = os; mostrarTicket(os); };
+    listEl.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════
+function carregarConfig() {
+  config = JSON.parse(localStorage.getItem('cfg') || '{"nome":"","end":"","tel":""}');
+  document.getElementById('cfg-nome').value = config.nome || '';
+  document.getElementById('cfg-end').value  = config.end  || '';
+  document.getElementById('cfg-tel').value  = config.tel  || '';
+  renderTiposConfig();
+}
+
+function salvarConfig() {
+  config = {
+    nome: document.getElementById('cfg-nome').value.trim(),
+    end:  document.getElementById('cfg-end').value.trim(),
+    tel:  document.getElementById('cfg-tel').value.trim(),
+  };
+  localStorage.setItem('cfg', JSON.stringify(config));
+  toast('Configurações salvas!');
+}
+
+// ═══════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+renderChips();
+renderValoresRapidos();
+carregarConfig();
+
+// Enter na placa
+document.getElementById('placa').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('valor').focus();
+});
+document.getElementById('novo-tipo').addEventListener('keydown', e => {
+  if (e.key === 'Enter') adicionarTipo();
+});
+</script>
+</body>
+</html>
