@@ -333,9 +333,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .cfg-row:last-child{border-bottom:none}
 
 @media print{
+  @page{size:58mm auto;margin:0mm 2mm}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important}
   body>*:not(#ticket-modal){display:none!important}
-  #ticket-modal{display:flex!important;position:static;background:none;padding:0}
-  #ticket-wrap{box-shadow:none;max-width:100%;border-radius:0}
+  #ticket-modal{display:block!important;position:static!important;background:none!important;padding:0!important;width:58mm!important;margin:0!important}
+  #ticket-modal>div{width:58mm!important;gap:0!important}
+  #ticket-wrap{box-shadow:none!important;max-width:58mm!important;width:58mm!important;border-radius:0!important;margin:0!important;padding:0!important}
   .no-print{display:none!important}
 }
 </style>
@@ -879,38 +883,37 @@ function mostrarTicket(os) {
   const hora = dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const data = dt.toLocaleDateString('pt-BR');
   document.getElementById('ticket-wrap').innerHTML=`
-<div style="padding:18px 15px;font-family:'Courier New',monospace;font-size:12px;line-height:1.6;color:#111">
-  <div style="text-align:center;padding-bottom:10px;border-bottom:2px dashed #333;margin-bottom:10px">
-    <div style="font-size:18px;margin-bottom:3px">🌊</div>
-    <div style="font-size:15px;font-weight:900;letter-spacing:1.5px">${(os.nomeEstab||'NOVA ONDA').toUpperCase()}</div>
-    <div style="font-size:10px;color:#555">LAVA RÁPIDO &amp; BORRACHARIA</div>
-    ${os.end?`<div style="font-size:10px;color:#666">${os.end}</div>`:''}
-    ${os.tel?`<div style="font-size:10px;color:#666">Tel: ${os.tel}</div>`:''}
+<div style="width:54mm;padding:4mm 2mm;font-family:'Courier New',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">
+  <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:3mm;margin-bottom:3mm">
+    <div style="font-size:11pt;font-weight:900;letter-spacing:1px">${(os.nomeEstab||'NOVA ONDA').toUpperCase()}</div>
+    <div style="font-size:7pt">LAVA RÁPIDO &amp; BORRACHARIA</div>
+    ${os.end?`<div style="font-size:7pt">${os.end}</div>`:''}
+    ${os.tel?`<div style="font-size:7pt">Tel: ${os.tel}</div>`:''}
   </div>
-  <div style="text-align:center;margin-bottom:10px">
-    <div style="font-size:9px;letter-spacing:2px;color:#888">ORDEM DE SERVIÇO</div>
-    <div style="font-size:14px;font-weight:900">#${os.numero}</div>
-    <div style="font-size:10px;color:#777">${data} às ${hora}</div>
+  <div style="text-align:center;margin-bottom:3mm">
+    <div style="font-size:7pt;letter-spacing:1px">ORDEM DE SERVICO</div>
+    <div style="font-size:10pt;font-weight:900">#${os.numero}</div>
+    <div style="font-size:7pt">${data} ${hora}</div>
   </div>
-  <div style="border:3px solid #111;border-radius:8px;padding:9px;text-align:center;margin-bottom:10px;background:#f5f5f5">
-    <div style="font-size:9px;letter-spacing:2px;color:#888;margin-bottom:3px">PLACA</div>
-    <div style="font-size:36px;font-weight:900;letter-spacing:6px;line-height:1">${os.placa}</div>
+  <div style="border:2px solid #000;padding:2mm;text-align:center;margin-bottom:3mm">
+    <div style="font-size:7pt;letter-spacing:1px;margin-bottom:1mm">PLACA</div>
+    <div style="font-size:22pt;font-weight:900;letter-spacing:4px;line-height:1">${os.placa}</div>
   </div>
-  <table style="width:100%;font-size:12px;margin-bottom:8px">
-    <tr><td style="color:#555">Serviço</td><td style="text-align:right;font-weight:700">${os.tipo}</td></tr>
-    <tr><td style="color:#555">Lavador</td><td style="text-align:right;font-weight:700">${os.lavador||'—'}</td></tr>
-    ${os.obs?`<tr><td colspan="2" style="font-size:10px;color:#777;padding-top:2px">Obs: ${os.obs}</td></tr>`:''}
-    <tr style="border-top:2px dashed #bbb">
-      <td style="padding-top:7px;font-weight:900;font-size:13px">TOTAL</td>
-      <td style="text-align:right;font-weight:900;font-size:22px;padding-top:7px">R$&nbsp;${Number(os.valor).toFixed(2).replace('.',',')}</td>
-    </tr>
-  </table>
-  <div style="border:2px solid #111;border-radius:5px;text-align:center;padding:6px;margin-bottom:10px">
-    <div style="font-size:9px;letter-spacing:2px;color:#888">STATUS</div>
-    <div style="font-size:13px;font-weight:900;letter-spacing:2px">⏳ AGUARDANDO</div>
+  <div style="border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm">
+    <div style="display:flex;justify-content:space-between"><span>Servico</span><span style="font-weight:700">${os.tipo}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Lavador</span><span style="font-weight:700">${os.lavador||'—'}</span></div>
+    ${os.obs?`<div style="font-size:7pt;margin-top:1mm">Obs: ${os.obs}</div>`:''}
   </div>
-  <div style="text-align:center;font-size:10px;color:#999;border-top:1px dashed #ccc;padding-top:7px">
-    Obrigado pela preferência!<br/>Nova Onda — LavaOS
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm">
+    <span style="font-size:10pt;font-weight:900">TOTAL</span>
+    <span style="font-size:16pt;font-weight:900">R$ ${Number(os.valor).toFixed(2).replace('.',',')}</span>
+  </div>
+  <div style="border:1px solid #000;text-align:center;padding:1mm;margin-bottom:3mm">
+    <div style="font-size:7pt">STATUS</div>
+    <div style="font-size:10pt;font-weight:900">*** AGUARDANDO ***</div>
+  </div>
+  <div style="text-align:center;font-size:7pt;border-top:1px dashed #000;padding-top:2mm">
+    Obrigado pela preferencia!<br/>Nova Onda - LavaOS
   </div>
 </div>`;
   document.getElementById('ticket-modal').classList.add('open');
@@ -974,6 +977,7 @@ function renderFila() {
       <div class="os-actions">
         <div class="spill ${os.status||'aguardando'}">${conc?'PRONTO':'LAVANDO'}</div>
         ${!conc?`<button class="btn btn-success btn-xs" onclick="finalizarOS('${os.numero}',event)">✓ Finalizar</button>`:''}
+        ${!conc?`<button class="btn btn-danger btn-xs" onclick="cancelarOS('${os.numero}',event)">✕ Cancelar</button>`:''}
         <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();mostrarTicket(${JSON.stringify(os).replace(/"/g,'&quot;')})">🖨</button>
       </div>`;
     el.appendChild(item);
@@ -998,6 +1002,29 @@ function finalizarOS(numero, event) {
   }
   renderFila();
   toast('OS concluída! ✅','ok');
+}
+
+function cancelarOS(numero, event) {
+  event.stopPropagation();
+  if (!confirm('Cancelar esta OS? O valor NÃO será contabilizado no financeiro.')) return;
+  const idx=filaCache.findIndex(o=>o.numero===numero);
+  if (idx<0) return;
+  filaCache[idx].status='cancelado';
+
+  // Remove do local storage (não afeta balanço)
+  const local=JSON.parse(localStorage.getItem('ordens_local')||'[]');
+  const li=local.findIndex(o=>o.numero===numero);
+  if (li>=0) { local[li].status='cancelado'; localStorage.setItem('ordens_local',JSON.stringify(local)); }
+
+  // Firebase — marca cancelado
+  if (fbOk && db && fns && filaCache[idx].id) {
+    fns.updateDoc(fns.doc(db,'ordens',filaCache[idx].id),{status:'cancelado'})
+      .catch(e=>console.warn('FB cancel:',e.message));
+  }
+  // Remove da fila visual
+  filaCache.splice(idx,1);
+  renderFila();
+  toast('OS cancelada — não afeta o financeiro','ok');
 }
 
 // ═══════════════════════════════════════════════
