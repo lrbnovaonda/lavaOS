@@ -629,7 +629,7 @@ let filaCache = [];
 window.addEventListener('firebase-ready', () => {
   db = window.__db; fns = window.__fns; fbOk = window.__fbOk;
   setDb(fbOk);
-  if (fbOk) carregarFila();
+  carregarFila(); // sempre carrega — local ou Firebase
 });
 
 function setDb(ok) {
@@ -720,12 +720,19 @@ function iniciarOCR() {
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
           tessedit_pageseg_mode: '7',
         });
-        const clean = text.replace(/[\s\-\.]/g,'').toUpperCase();
-        // Mercosul AAA0B00, antiga AAA0000, aceita variações
-        const m = clean.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/) ||
-                  clean.match(/[A-Z]{3}[0-9]{4}/) ||
-                  clean.match(/[A-Z]{3}[0-9][A-Z0-9][0-9]{2}/);
-        if (m) detectada = m[0];
+        // Remove tudo que não é letra/número, uppercase
+        const clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
+
+        // Tenta padrões do mais específico ao mais tolerante
+        const m = clean.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/)   // Mercosul exato
+                ||clean.match(/[A-Z]{3}[0-9]{4}/)              // Antiga exata
+                ||clean.match(/[A-Z]{3}[0-9][A-Z0-9][0-9]{2}/) // Qualquer híbrido
+                ||(clean.length>=7 ? [clean.substring(0,7)] : null); // Fallback: 7 primeiros chars
+
+        // Valida mínimo: começa com 3 letras e tem ao menos 1 número
+        if (m && /^[A-Z]{3}/.test(m[0]) && /[0-9]/.test(m[0]) && m[0].length===7) {
+          detectada = m[0];
+        }
       } catch(e) {}
     }
 
@@ -914,24 +921,28 @@ function fecharTicket() { document.getElementById('ticket-modal').classList.remo
 // FILA
 // ═══════════════════════════════════════════════
 async function carregarFila() {
-  const el=document.getElementById('fila-list');
-  el.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">Carregando…</div>';
   const hoje=new Date().toDateString();
-  let ordens=JSON.parse(localStorage.getItem('ordens_local')||'[]')
-             .filter(o=>new Date(o.criadoEm).toDateString()===hoje);
 
-  if (fbOk && db && fns) {
-    try {
-      const snap=await fns.getDocs(fns.query(fns.collection(db,'ordens'),fns.orderBy('criadoEm','desc'),fns.limit(100)));
-      const fb=[]; snap.forEach(d=>fb.push({id:d.id,...d.data()}));
-      if (fb.length) ordens=fb.filter(o=>{
-        const dt=o.criadoEm?.toDate?o.criadoEm.toDate():new Date(o.criadoEm);
-        return dt.toDateString()===hoje;
-      });
-    } catch(e){}
-  }
-  filaCache=ordens;
+  // 1. Mostra dados locais IMEDIATAMENTE — sem spinner
+  const local=JSON.parse(localStorage.getItem('ordens_local')||'[]')
+              .filter(o=>new Date(o.criadoEm).toDateString()===hoje);
+  filaCache=local;
   renderFila();
+
+  // 2. Se Firebase disponível, tenta atualizar em background (sem travar tela)
+  if (!fbOk || !db || !fns) return;
+  try {
+    const snap=await fns.getDocs(fns.query(fns.collection(db,'ordens'),fns.orderBy('criadoEm','desc'),fns.limit(100)));
+    const fb=[]; snap.forEach(d=>fb.push({id:d.id,...d.data()}));
+    const fbHoje=fb.filter(o=>{
+      const dt=o.criadoEm?.toDate?o.criadoEm.toDate():new Date(o.criadoEm);
+      return dt.toDateString()===hoje;
+    });
+    if (fbHoje.length >= filaCache.length) {
+      filaCache=fbHoje;
+      renderFila();
+    }
+  } catch(e){ console.warn('FB fila:', e.message); }
 }
 
 function renderFila() {
