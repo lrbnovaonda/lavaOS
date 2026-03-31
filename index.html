@@ -163,14 +163,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .btn-sm{padding:8px 13px;font-size:12px;width:auto}
 .btn-xs{padding:6px 10px;font-size:11px;width:auto}
 
-/* Camera */
+/* Camera - MUDANÇA NA MIRA DA IA */
 #cam-wrap,#cam-wrap-b{display:none;margin-bottom:14px;border-radius:var(--r);overflow:hidden;
   border:1px solid var(--border);position:relative;background:#000;aspect-ratio:16/9}
 .cam-video{width:100%;height:100%;object-fit:cover;display:block}
 .cam-ov{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
-.sf{width:76%;height:54%;border:2.5px solid var(--cyan);border-radius:8px;
-  box-shadow:0 0 0 9999px rgba(0,0,0,.5),0 0 28px rgba(41,182,246,.25);position:relative}
-.sf.amber-sf{border-color:var(--amber);box-shadow:0 0 0 9999px rgba(0,0,0,.5),0 0 28px rgba(245,158,11,.25)}
+/* A MIRA AGORA É UMA FENDA FINA APENAS PARA AS LETRAS */
+.sf{width:80%;height:25%;border:2.5px solid var(--cyan);border-radius:8px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 28px rgba(41,182,246,.25);position:relative}
+.sf.amber-sf{border-color:var(--amber);box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 28px rgba(245,158,11,.25)}
 .sl{position:absolute;left:0;right:0;height:2px;
   background:linear-gradient(90deg,transparent,var(--cyan),transparent);
   animation:scan 1.8s ease-in-out infinite;box-shadow:0 0 10px var(--cyan)}
@@ -401,7 +402,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <div id="cam-wrap">
       <video id="cam-video" class="cam-video" autoplay playsinline muted></video>
       <div class="cam-ov"><div class="sf"><div class="sl"></div><div class="sc"><span></span><span></span><span></span><span></span></div></div></div>
-      <div class="ocr-st" id="ocr-st-lava">Aponte para a placa…</div>
+      <div class="ocr-st" id="ocr-st-lava">Enquadre APENAS as letras e números</div>
     </div>
     <button class="btn btn-ghost" id="btn-cam-lava" onclick="toggleCam('lava')" style="margin-bottom:12px">📷 Abrir câmera</button>
     <div class="ig"><label>Placa do veículo</label>
@@ -445,7 +446,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <div id="cam-wrap-b">
       <video id="cam-video-b" class="cam-video" autoplay playsinline muted></video>
       <div class="cam-ov"><div class="sf amber-sf"><div class="sl amber-sl"></div><div class="sc"><span></span><span></span><span></span><span></span></div></div></div>
-      <div class="ocr-st" id="ocr-st-borra" style="color:var(--amber)">Aponte para a placa…</div>
+      <div class="ocr-st" id="ocr-st-borra" style="color:var(--amber)">Enquadre APENAS as letras e números</div>
     </div>
     <button class="btn btn-ghost" id="btn-cam-borra" onclick="toggleCam('borra')" style="margin-bottom:12px">📷 Abrir câmera</button>
     <div class="ig"><label>Placa do veículo</label>
@@ -805,7 +806,7 @@ function trancarGerencia() {
 }
 
 // ════════════════════════════════════════
-// CÂMERA + OCR (INTELIGENTE E RÁPIDO)
+// CÂMERA + OCR (MIRA FENDA E AUTO-CORRETOR)
 // ════════════════════════════════════════
 async function toggleCam(ctx){
   if(camOn&&camContext===ctx){stopCam();return;}
@@ -871,72 +872,72 @@ function iniciarOCR(ctx){
     const ctx2d = c.getContext('2d');
     ctx2d.drawImage(video,0,0,vw,vh);
     
-    // Regiões de busca (da mais ampla para a mais focada)
-    const regioes=[
-      [0.05, 0.15, 0.90, 0.70], // Ampla
-      [0.10, 0.25, 0.80, 0.50], // Média
-      [0.12, 0.23, 0.76, 0.54]  // Focada
-    ];
+    // CORTE CIRÚRGICO DA FENDA (80% largura x 20% altura - bem no meio)
+    const cropW = vw * 0.80;
+    const cropH = vh * 0.20;
+    const cropX = (vw - cropW) / 2;
+    const cropY = (vh - cropH) / 2;
     
-    let detectada = null;
-
-    for(const[rx, ry, rw, rh] of regioes){
-      if(detectada) break;
-      
-      const cropW = vw * rw;
-      const cropH = vh * rh;
-      const cropX = vw * rx;
-      const cropY = vh * ry;
-      
-      const crop=document.createElement('canvas');
-      crop.width = cropW;
-      crop.height = cropH;
-      const cCtx=crop.getContext('2d');
-      
-      cCtx.filter = 'contrast(1.4) brightness(1.1) grayscale(1)';
-      cCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
-      
-      try{
-        const {data:{text}} = await ocrWorker.recognize(crop);
-        let clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
-
-        if(clean.length >= 7) {
-           for(let i=0; i <= clean.length - 7; i++){
-              let trecho = clean.substring(i, i+7);
-              let arr = trecho.split('');
-              
-              // AUTO CORRETOR INTELIGENTE
-              const toL = (char) => ({'0':'O','1':'I','5':'S','8':'B','2':'Z'})[char] || char;
-              const toN = (char) => ({'O':'0','I':'1','S':'5','B':'8','Z':'2','G':'6'})[char] || char;
-
-              arr[0] = toL(arr[0]);
-              arr[1] = toL(arr[1]);
-              arr[2] = toL(arr[2]);
-              arr[3] = toN(arr[3]);
-              // arr[4] pode ser letra ou número no Mercosul
-              arr[5] = toN(arr[5]);
-              arr[6] = toN(arr[6]);
-
-              let finalPlaca = arr.join('');
-
-              if(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(finalPlaca)) {
-                 detectada = finalPlaca;
-                 break;
-              }
-           }
-        }
-      }catch(e){}
-    }
+    const crop=document.createElement('canvas');
+    // Aumentar a resolução da fenda melhora a leitura da IA
+    crop.width = cropW * 1.5;
+    crop.height = cropH * 1.5;
+    const cCtx=crop.getContext('2d');
     
-    if(detectada){
-       document.getElementById(placaId).value = detectada;
-       st.textContent='✅ ' + detectada;
-       toast('✅ Placa: ' + detectada,'ok');
-       setTimeout(stopCam,700);
-       return;
-    }
+    // Filtro extremo: Mata luz estourada e sombras, deixa quase preto e branco
+    cCtx.filter = 'contrast(2.5) brightness(1.2) grayscale(1)';
+    cCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
     
-    st.textContent='Aponte para a placa…';
+    try{
+      const {data:{text}} = await ocrWorker.recognize(crop);
+      // Limpa tudo que não for letra e número (tira traços, espaços, sujeiras)
+      let clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
+
+      // AUTO-CORRETOR E DESLIZAMENTO
+      // Se a IA leu pelo menos 7 caracteres no meio do lixo (Ex: leu 'BROZH9F6O')
+      if(clean.length >= 7) {
+         let detectada = null;
+         
+         // Desliza pela palavra de 7 em 7 letras procurando o padrão
+         for(let i=0; i <= clean.length - 7; i++){
+            let trecho = clean.substring(i, i+7);
+            let arr = trecho.split('');
+            
+            // Dicionário de correção da IA (O que ela mais confunde)
+            const forcaLetra = (char) => ({'0':'O','1':'I','5':'S','8':'B','2':'Z'})[char] || char;
+            const forcaNum = (char) => ({'O':'0','I':'1','S':'5','B':'8','Z':'2','G':'6','Q':'0','D':'0'})[char] || char;
+
+            // Formato Placa Brasil: LLL (Letras)
+            arr[0] = forcaLetra(arr[0]);
+            arr[1] = forcaLetra(arr[1]);
+            arr[2] = forcaLetra(arr[2]);
+            // N (Número)
+            arr[3] = forcaNum(arr[3]);
+            // A posição 4 pode ser Letra (Mercosul) ou Número (Antiga), não forçamos.
+            // NN (Números)
+            arr[5] = forcaNum(arr[5]);
+            arr[6] = forcaNum(arr[6]);
+
+            let testPlaca = arr.join('');
+
+            // Se o trecho corrigido bater com Mercosul ou Antiga, Achamos!
+            if(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(testPlaca)) {
+               detectada = testPlaca;
+               break;
+            }
+         }
+
+         if(detectada) {
+            document.getElementById(placaId).value = detectada;
+            st.textContent='✅ ' + detectada;
+            toast('✅ Placa: ' + detectada,'ok');
+            setTimeout(stopCam,700);
+            return;
+         }
+      }
+    }catch(e){}
+    
+    st.textContent='Enquadre APENAS as letras e números...';
     ocrBusy=false; ocrTimer=setTimeout(loop,500);
   }
   setTimeout(loop,800);
