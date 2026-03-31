@@ -1218,8 +1218,21 @@ function renderVals(containerId){
 }
 
 // ════════════════════════════════════════
-// ABRIR OS (lava + borra)
+// ABRIR OS (GERAÇÃO SEQUENCIAL DE NÚMEROS)
 // ════════════════════════════════════════
+function gerarNum(){
+  // Pega o número atual do banco local (começa em 0 se não existir) e soma 1
+  let seq = parseInt(localStorage.getItem('os_seq') || '0') + 1;
+  // Salva o novo número atualizado
+  localStorage.setItem('os_seq', seq);
+  
+  // Transforma o número num formato de 8 dígitos preenchido com zeros (ex: 00000001)
+  const str = String(seq).padStart(8, '0');
+  
+  // Corta no meio pra ficar 0000-0001
+  return str.slice(0,4) + '-' + str.slice(4);
+}
+
 async function abrirOS(tipo){
   const placaId=tipo==='lava'?'placa-lava':'placa-borra';
   const valorId=tipo==='lava'?'valor-lava':'valor-borra';
@@ -1280,11 +1293,6 @@ async function abrirOS(tipo){
   btn.textContent=tipo==='lava'?'✅ Abrir OS e Gerar Ticket':'🔧 Abrir OS Borracharia';
 }
 window.abrirOS = abrirOS;
-
-function gerarNum(){
-  const d=new Date();
-  return `${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}-${Math.floor(Math.random()*9000)+1000}`;
-}
 
 // ════════════════════════════════════════
 // TICKET
@@ -1736,6 +1744,7 @@ window.confirmarSenha = function(){
     if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
       localStorage.removeItem('ordens_local');
       localStorage.removeItem('gastos');
+      localStorage.removeItem('os_seq'); // Zera o contador sequencial das OS
       filaCache=[]; renderFila(); toast('Sistema zerado com sucesso!','ok');
     }
   }
