@@ -304,7 +304,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 
 /* 58mm thermal print */
 @media print{
-  @page{size:58mm auto;margin:0mm 2mm}
+  @page{size:58mm auto;margin:0}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important}
   body>*:not(#ticket-modal){display:none!important}
@@ -951,7 +951,7 @@ function mostrarTicket(os){
   const tResLabel=isBorra?'Borracheiro':'Lavador';
   const tValor='R$ '+Number(os.valor).toFixed(2).replace('.',',');
   document.getElementById('ticket-wrap').innerHTML=
-    '<div style="width:54mm;padding:4mm 2mm;font-family:\'Courier New\',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">'+
+    '<div style="width:100%;max-width:58mm;box-sizing:border-box;padding:2mm;font-family:\'Courier New\',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">'+
     '<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:3mm;margin-bottom:3mm">'+
     '<div style="font-size:11pt;font-weight:900;letter-spacing:1px">'+tNome+'</div>'+
     '<div style="font-size:7pt">'+tSub+'</div>'+tEnd+tTel+
