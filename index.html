@@ -639,6 +639,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   </div>
   
   <div class="card"><div class="card-title">Tipos de Lavagem</div><div id="cfg-tipos"></div></div>
+  <div class="card" style="border-color:rgba(245,158,11,.3)"><div class="card-title amber">Serviços de Borracharia</div><div id="cfg-borra-servs"></div></div>
   
   <div class="card" style="border-color:rgba(255,76,106,.3)">
     <div class="card-title" style="color:#ff4c6a">Firebase / Acesso</div>
@@ -694,7 +695,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 // ════════════════════════════════════════
 // CONSTANTES E PIN DA GERÊNCIA
 // ════════════════════════════════════════
-// A senha padrão do "Cofre" caso você não tenha mudado em Config
 let senhaAdmin = localStorage.getItem('senha_admin') || 'masternovaonda';
 
 const LAV_LAVA    = ['João Pedro','Litio','Samuel','Cleber','Glauber','Cleberson','Gustavo','Avulso'];
@@ -702,13 +702,13 @@ const LAV_BORRA   = ['Andrei','João Pedro','Avulso'];
 const VALS_RAP    = [15,20,25,30,40,50,60,80,100,120,150,200];
 const CAT_LABELS  = {agua:'Água',energia:'Energia',produto:'Produto',salario:'Salário',outros:'Outros'};
 const CAT_COLORS  = {agua:'rgba(41,182,246,.7)',energia:'rgba(255,184,0,.7)',produto:'rgba(102,187,106,.7)',salario:'rgba(171,71,188,.7)',outros:'rgba(255,112,67,.7)'};
-const BORRA_SERVS = ['Remendo a macarrão','Remendo a quente','Remendo a frio','Troca de pneus','Troca câmara de ar','Troca de válvula','Vulcanização','Rodízio de pneu','Outro'];
 
 // ════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════
 let db,fns,fbOk=false;
 let tipos=JSON.parse(localStorage.getItem('tipos')||'["Simples","Completa","Polimento","Higienização","Enceramento","Externo"]');
+let borraServs=JSON.parse(localStorage.getItem('borraServs')||'["Remendo a macarrão","Remendo a quente","Remendo a frio","Troca de pneus","Troca câmara de ar","Troca de válvula","Vulcanização","Rodízio de pneu","Outro"]');
 let cfg=JSON.parse(localStorage.getItem('cfg')||'{"nome":"Lava Rápido Nova Onda","end":"Av Deli Lacerda N-888 Centro - Quaraçu","tel":"(77) 99937-7205"}');
 let tipoSel=null, lavSelLava=null, lavSelBorra=null, borraServsSel=[];
 let camStream=null,camOn=false,ocrTimer=null,ocrBusy=false,camContext='lava';
@@ -777,7 +777,7 @@ function setTab(t){
   btns[idx[t]].classList.add('active');
   
   if(t==='fila')      carregarFila();
-  if(t==='config')    {loadCfg();renderCfgTipos();}
+  if(t==='config')    {loadCfg();renderCfgTipos();renderCfgBorraServs();}
 }
 
 function setFinSubTab(tab){
@@ -796,7 +796,6 @@ function trancarGerencia() {
   setTab('nova');
   toast('Cofre da gerência trancado 🔒','ok');
 }
-
 
 // ════════════════════════════════════════
 // CÂMERA + OCR (shared)
@@ -955,10 +954,12 @@ function salvarTipo(t,i){
   toast('Tipo atualizado!','ok');
 }
 
-// BORRA serviços (multi-select)
+// ════════════════════════════════════════
+// SERVIÇOS DA BORRACHARIA
+// ════════════════════════════════════════
 function renderBorraServs(){
   const c=document.getElementById('chips-borra-servicos'); c.innerHTML='';
-  BORRA_SERVS.forEach(s=>{
+  borraServs.forEach(s=>{
     const sel=borraServsSel.includes(s);
     const el=document.createElement('div');
     el.className='chip'+(sel?' amber-sel':'');
@@ -971,7 +972,64 @@ function renderBorraServs(){
     c.appendChild(el);
   });
 }
+function saveBorraServs(){localStorage.setItem('borraServs',JSON.stringify(borraServs));}
+function remBorraServ(t){
+  borraServs=borraServs.filter(x=>x!==t);
+  borraServsSel=borraServsSel.filter(x=>x!==t);
+  saveBorraServs();renderBorraServs();renderCfgBorraServs();
+}
+function renderCfgBorraServs(){
+  const c=document.getElementById('cfg-borra-servs');if(!c)return;c.innerHTML='';
+  const addRow=document.createElement('div');addRow.style.cssText='display:flex;gap:8px;margin-bottom:14px';
+  addRow.innerHTML='<input id="cfg-novo-borra" type="text" placeholder="Novo serviço..." style="flex:1"/><button class="btn btn-amber btn-sm" onclick="addBorraServFromCfg()">＋ Adicionar</button>';
+  c.appendChild(addRow);
+  borraServs.forEach((t,i)=>{
+    const tid='borra_'+i;
+    const tesc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const r=document.createElement('div');r.className='cfg-row';r.id='cfg-row-'+tid;
+    r.innerHTML=`<span id="lbl-${tid}" style="font-size:14px;flex:1">${t}</span>
+      <input id="inp-${tid}" type="text" value="${t}" style="display:none;flex:1;padding:6px 10px;font-size:14px;margin-right:8px"/>
+      <div style="display:flex;gap:5px">
+        <button id="bedit-${tid}" class="btn btn-ghost btn-xs" onclick="editarBorraServ('${tesc}',${i})">✏️</button>
+        <button id="bsave-${tid}" class="btn btn-success btn-xs" style="display:none" onclick="salvarBorraServ('${tesc}',${i})">✓</button>
+        <button class="btn btn-danger btn-xs" onclick="remBorraServ('${tesc}')">🗑</button>
+      </div>`;
+    c.appendChild(r);
+  });
+}
+function addBorraServFromCfg(){
+  const inp=document.getElementById('cfg-novo-borra');
+  const v=inp.value.trim();
+  if(!v||borraServs.includes(v)){inp.value='';return;}
+  borraServs.push(v);saveBorraServs();renderBorraServs();renderCfgBorraServs();inp.value='';
+  toast('Serviço adicionado!','ok');
+}
+function editarBorraServ(t,i){
+  const tid='borra_'+i;
+  document.getElementById('lbl-'+tid).style.display='none';
+  document.getElementById('inp-'+tid).style.display='flex';
+  document.getElementById('bedit-'+tid).style.display='none';
+  document.getElementById('bsave-'+tid).style.display='inline-flex';
+  document.getElementById('inp-'+tid).focus();
+}
+function salvarBorraServ(t,i){
+  const tid='borra_'+i;
+  const novoNome=document.getElementById('inp-'+tid)?.value.trim();
+  if(!novoNome){toast('Nome vazio!','err');return;}
+  if(borraServs.includes(novoNome)&&novoNome!==t){toast('Já existe!','err');return;}
+  
+  if(borraServsSel.includes(t)){
+    borraServsSel = borraServsSel.map(x => x === t ? novoNome : x);
+  }
+  
+  borraServs[i]=novoNome;
+  saveBorraServs();renderBorraServs();renderCfgBorraServs();
+  toast('Serviço atualizado!','ok');
+}
 
+// ════════════════════════════════════════
+// VALORES
+// ════════════════════════════════════════
 function renderVals(containerId){
   const c=document.getElementById(containerId); c.innerHTML='';
   const inputId=containerId==='chips-vals'?'valor-lava':'valor-borra';
@@ -1327,7 +1385,7 @@ function renderHistorico(ordens){
   if(!sorted.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Nenhuma OS</p>';return;}
   el.innerHTML='';
   sorted.forEach(os=>{
-    const dt=new Date(os.criadoEm?.toDate?os.criadoEm.toDate():os.criadoEm);
+    const dt=new Date(os.criadoEm?.toDate?o.criadoEm.toDate():os.criadoEm);
     const data=isNaN(dt)?'—':dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
     const hora=isNaN(dt)?'—':dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     const row=document.createElement('div');row.className='fin-row';
@@ -1618,6 +1676,7 @@ renderBorraServs();
 renderVals('chips-vals');
 renderVals('chips-vals-borra');
 loadCfg();
+renderCfgBorraServs();
 document.getElementById('novo-tipo').addEventListener('keydown',e=>{if(e.key==='Enter')addTipo();});
 </script>
 </body>
