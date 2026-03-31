@@ -20,6 +20,7 @@ import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, query, order
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+// SUAS CHAVES DO FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyA23H3l5ocA8b8z0cKN9KvDMPGT3EiZVqY",
   authDomain: "nova-onda-sistema.firebaseapp.com",
@@ -28,6 +29,7 @@ const firebaseConfig = {
   messagingSenderId: "597441439330",
   appId: "1:597441439330:web:e8afdc64477cb2fed5933b"
 };
+
 try {
   const app=initializeApp(firebaseConfig);
   const db=getFirestore(app);
@@ -40,13 +42,16 @@ try {
   await getDocs(query(collection(db,'ordens'),orderBy('criadoEm','desc'),limit(1)));
   window.__fbOk=true;
 
-  // Fica escutando se o dono está logado ou não
+  // CONTROLE DE ENTRADA DO APLICATIVO
   onAuthStateChanged(auth, (user) => {
     window.__authUser = user;
-    if(!user) {
-      const fl = document.getElementById('fin-locked');
-      const fc = document.getElementById('fin-content');
-      if(fl && fc) { fl.style.display='block'; fc.style.display='none'; }
+    if(user) {
+      document.getElementById('tela-login').classList.remove('show');
+      document.getElementById('app').classList.add('show');
+    } else {
+      document.getElementById('tela-login').classList.add('show');
+      document.getElementById('app').classList.remove('show');
+      document.getElementById('login-senha-app').value = '';
     }
   });
 
@@ -71,7 +76,12 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:radial-gradient(ellipse 90% 50% at 50% -5%,rgba(21,101,192,.3) 0%,transparent 65%),
              radial-gradient(ellipse 50% 35% at 90% 100%,rgba(41,182,246,.1) 0%,transparent 55%);}
 [data-theme="light"] body::before,[data-theme="dark"] body::before{display:none}
-#app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* Telas Principais */
+#tela-login{display:none;position:fixed;inset:0;background:var(--bg);z-index:99999;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+#tela-login.show{display:flex;animation:fadeUp .4s ease}
+#app{display:none;position:relative;z-index:1;min-height:100vh;flex-direction:column}
+#app.show{display:flex}
 
 /* Header */
 header{background:rgba(7,17,31,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);
@@ -204,7 +214,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
 
 /* Fila sub-tabs */
-.sub-tabs{display:flex;gap:0;border-radius:var(--rs);overflow:hidden;border:1px solid var(--border)}
+.sub-tabs{display:flex;gap:0;margin-bottom:16px;border-radius:var(--rs);overflow:hidden;border:1px solid var(--border)}
 .sub-tab{flex:1;padding:11px 8px;background:var(--glass);border:none;color:var(--muted);
   cursor:pointer;font-family:var(--fh);font-size:12px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;transition:all .2s;text-align:center}
@@ -295,7 +305,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .confirm-box h3{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:8px;color:var(--text)}
 .confirm-box p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6}
 
-/* Senha modal */
+/* Senha modal (PIN) */
 #senha-modal{display:none;position:fixed;inset:0;z-index:110;
   background:rgba(0,0,0,.9);align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(10px)}
 #senha-modal.open{display:flex;animation:fadeUp .25s ease}
@@ -347,6 +357,24 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div style="display:flex;gap:10px">
     <button class="btn btn-ghost" onclick="fecharInstall()" style="flex:1;font-size:14px;padding:10px">Depois</button>
     <button class="btn btn-cyan" onclick="instalarApp()" style="flex:1;font-size:14px;padding:10px">Instalar</button>
+  </div>
+</div>
+
+<div id="tela-login" class="show">
+  <div class="logo-icon" style="width:70px;height:70px;font-size:34px;margin-bottom:16px;animation:none">🌊</div>
+  <h2 style="font-family:var(--fh);font-size:24px;margin-bottom:8px">Nova Onda</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:30px">Acesso restrito ao sistema</p>
+  
+  <div class="card" style="width:100%;max-width:340px;padding:24px">
+    <div class="ig">
+      <label>E-mail oficial</label>
+      <input id="login-email-app" type="email" placeholder="lrbnovaonda@gmail.com"/>
+    </div>
+    <div class="ig">
+      <label>Senha</label>
+      <input id="login-senha-app" type="password" placeholder="••••••••"/>
+    </div>
+    <button class="btn btn-cyan" id="btn-login-app" onclick="fazerLoginApp()" style="margin-top:10px">Entrar no Sistema</button>
   </div>
 </div>
 
@@ -475,7 +503,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div id="fin-locked" style="text-align:center;padding:60px 20px">
     <div style="font-size:52px;margin-bottom:12px">🔒</div>
     <p style="color:var(--muted);margin-bottom:20px">Área restrita — gerência</p>
-    <button class="btn btn-primary" style="max-width:280px;margin:0 auto" onclick="pedirSenha('fin')">Entrar com senha</button>
+    <button class="btn btn-primary" style="max-width:280px;margin:0 auto" onclick="pedirSenha('fin')">Destravar Cofre (PIN)</button>
   </div>
 
   <div id="fin-content" style="display:none">
@@ -485,7 +513,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         <button class="sub-tab active-lava" id="fin-tab-geral" onclick="setFinSubTab('geral')">💰 Financeiro</button>
         <button class="sub-tab" id="fin-tab-rel" onclick="setFinSubTab('rel')">📊 Relatórios</button>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="sairGerencia()" style="color:#ff5252; border-color:rgba(255,82,82,0.3); padding:0 12px">Sair 🔒</button>
+      <button class="btn btn-ghost btn-sm" onclick="trancarGerencia()" style="color:#ff5252; border-color:rgba(255,82,82,0.3); padding:0 12px">Trancar 🔒</button>
     </div>
 
     <div id="fin-geral-wrap">
@@ -593,6 +621,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <div class="ig"><label>Telefone</label><input id="cfg-tel" type="tel"/></div>
     <button class="btn btn-primary" onclick="salvarCfg()">💾 Salvar</button>
   </div>
+  
+  <div class="card">
+    <div class="card-title">🔐 Senha da Gerência (PIN)</div>
+    <div class="ig"><label>Senha Atual</label><input id="cfg-senha-atual" type="password" placeholder="Digite o PIN atual"/></div>
+    <div class="ig"><label>Nova Senha</label><input id="cfg-senha-nova" type="password" placeholder="Novo PIN (mínimo 4 caracteres)"/></div>
+    <button class="btn btn-primary" onclick="alterarSenhaAdmin()">💾 Alterar PIN</button>
+  </div>
 
   <div class="card">
     <div class="card-title">Tema do App</div>
@@ -602,22 +637,18 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
       <div class="theme-btn" id="theme-light" onclick="setTheme('light',this)">☀️ Claro</div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-title">Firebase</div>
+  
+  <div class="card"><div class="card-title">Tipos de Lavagem</div><div id="cfg-tipos"></div></div>
+  
+  <div class="card" style="border-color:rgba(255,76,106,.3)">
+    <div class="card-title" style="color:#ff4c6a">Firebase / Acesso</div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <div class="dot" id="db-dot2"></div><span id="db-lbl2">Aguardando…</span>
     </div>
-    <p style="font-size:13px;color:var(--muted);line-height:1.7">
-      Edite <code style="color:var(--accent)">firebaseConfig</code> no topo do
-      <code style="color:var(--accent)">index.html</code> →
-      <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a>
-    </p>
-  </div>
-  <div class="card"><div class="card-title">Tipos de Lavagem</div><div id="cfg-tipos"></div></div>
-  <div class="card" style="border-color:rgba(255,76,106,.3)">
-    <div class="card-title" style="color:#ff4c6a">Zona de Perigo</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Apaga todos os dados locais. Irreversível.</p>
-    <button class="btn btn-danger" onclick="pedirSenha('reset')">🗑 Zerar Sistema</button>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Sua conta do Google está conectada neste aparelho.</p>
+    <button class="btn btn-ghost" style="color:#ff4c6a;border-color:rgba(255,76,106,.3);margin-bottom:12px" onclick="sairDoApp()">🔒 Sair do Sistema Geral</button>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">Apaga todos os dados locais. Irreversível.</p>
+    <button class="btn btn-danger" onclick="pedirSenha('reset')">🗑 Zerar Base de Dados</button>
   </div>
 </div>
 </div>
@@ -645,21 +676,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 <div id="senha-modal">
   <div class="senha-box">
     <div style="font-size:40px;margin-bottom:10px">🔐</div>
-    <h3>Acesso Restrito</h3>
-    <p id="senha-desc" style="margin-bottom:14px">Autenticação Firebase</p>
-    
+    <h3>Cofre da Gerência</h3>
+    <p id="senha-desc" style="margin-bottom:14px">Digite o PIN para destravar</p>
     <div class="ig">
-      <input id="login-email" type="email" value="lrbnovaonda@gmail.com" 
-      style="background:rgba(0,0,0,0.1); color:var(--accent); font-weight:bold; text-align:center" />
+      <input id="senha-inp" type="password" placeholder="••••••••"/>
     </div>
-    
-    <div class="ig">
-      <input id="senha-inp" type="password" placeholder="Sua senha..."/>
-    </div>
-    
     <div style="display:flex;gap:8px; margin-top:16px">
       <button class="btn btn-ghost" onclick="fecharSenha()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarSenha()">Entrar</button>
+      <button class="btn btn-primary" onclick="confirmarSenha()">Destravar</button>
     </div>
   </div>
 </div>
@@ -668,9 +692,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 
 <script>
 // ════════════════════════════════════════
-// CONSTANTES 
-// (A senha agora é gerenciada pelo Firebase)
+// CONSTANTES E PIN DA GERÊNCIA
 // ════════════════════════════════════════
+// A senha padrão do "Cofre" caso você não tenha mudado em Config
+let senhaAdmin = localStorage.getItem('senha_admin') || 'masternovaonda';
+
 const LAV_LAVA    = ['João Pedro','Litio','Samuel','Cleber','Glauber','Cleberson','Gustavo','Avulso'];
 const LAV_BORRA   = ['Andrei','João Pedro','Avulso'];
 const VALS_RAP    = [15,20,25,30,40,50,60,80,100,120,150,200];
@@ -692,23 +718,52 @@ let chartReceita=null,chartGastos=null;
 let senhaCtx=null,cancelPendingNum=null;
 
 // ════════════════════════════════════════
-// FIREBASE
+// FIREBASE E LOGIN NO APP
 // ════════════════════════════════════════
 window.addEventListener('firebase-ready',()=>{
   db=window.__db;fns=window.__fns;fbOk=window.__fbOk;
   setDb(fbOk); carregarFila();
 });
+
 function setDb(ok){
   ['db-dot','db-dot2'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='dot '+(ok?'on':'off');});
   document.getElementById('db-lbl').textContent=ok?'Online':'Local';
-  const l2=document.getElementById('db-lbl2');if(l2)l2.textContent=ok?'✓ Conectado':'Offline — configure as chaves';
+  const l2=document.getElementById('db-lbl2');if(l2)l2.textContent=ok?'✓ Conectado':'Offline — Verifique a internet';
+}
+
+async function fazerLoginApp() {
+  const email = document.getElementById('login-email-app').value.trim();
+  const pwd = document.getElementById('login-senha-app').value;
+  
+  if(!email || !pwd){ toast('Preencha e-mail e senha','err'); return; }
+  if(!window.__fbOk || !window.__auth || !window.__fns) { toast('Conecte à internet primeiro!','err'); return; }
+
+  const btn = document.getElementById('btn-login-app');
+  btn.disabled = true; btn.textContent = 'Carregando...';
+
+  try {
+    await window.__fns.signInWithEmailAndPassword(window.__auth, email, pwd);
+    toast('Bem-vindo ao sistema! ✅','ok');
+  } catch(e) {
+    console.error(e);
+    toast('E-mail ou senha incorretos!','err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar no Sistema';
+  }
+}
+
+function sairDoApp() {
+  if(confirm('Tem certeza que deseja desconectar o sistema deste aparelho? O login será exigido novamente.')) {
+    if(window.__auth) window.__fns.signOut(window.__auth);
+    toast('Sistema desconectado 🔒','ok');
+  }
 }
 
 // ════════════════════════════════════════
 // TABS E SUB-TABS
 // ════════════════════════════════════════
 function setTab(t){
-  // Tranca financeiro/relatório ao sair (apenas visualmente, a segurança real é no DB)
+  // Tranca financeiro ao sair para outra aba
   if(t!=='financeiro'){
     document.getElementById('fin-locked').style.display='block';
     document.getElementById('fin-content').style.display='none';
@@ -723,15 +778,6 @@ function setTab(t){
   
   if(t==='fila')      carregarFila();
   if(t==='config')    {loadCfg();renderCfgTipos();}
-  if(t==='financeiro') {
-    // Se a sessão da Google já estiver ativa em segundo plano, entra direto
-    if(window.__authUser){
-      document.getElementById('fin-locked').style.display='none';
-      document.getElementById('fin-content').style.display='block';
-      renderFinanceiro();
-      carregarRelatorio();
-    }
-  }
 }
 
 function setFinSubTab(tab){
@@ -743,6 +789,14 @@ function setFinSubTab(tab){
   if(tab==='rel') carregarRelatorio();
   if(tab==='geral') renderFinanceiro();
 }
+
+function trancarGerencia() {
+  document.getElementById('fin-locked').style.display='block';
+  document.getElementById('fin-content').style.display='none';
+  setTab('nova');
+  toast('Cofre da gerência trancado 🔒','ok');
+}
+
 
 // ════════════════════════════════════════
 // CÂMERA + OCR (shared)
@@ -1414,12 +1468,11 @@ function filtrarPorPeriodo(p,items){
 }
 
 // ════════════════════════════════════════
-// SENHA (FIREBASE AUTH)
+// SENHAS E SEGURANÇA (PIN DA GERÊNCIA E RESET)
 // ════════════════════════════════════════
 function pedirSenha(ctx){
   senhaCtx=ctx;
 
-  // Se o dono já logou e só quer fazer o reset local, permite direto sem pedir senha de novo
   if(ctx === 'reset' && window.__authUser) {
      if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
          localStorage.removeItem('ordens_local');
@@ -1430,7 +1483,7 @@ function pedirSenha(ctx){
   }
 
   document.getElementById('senha-inp').value='';
-  document.getElementById('senha-desc').textContent=ctx==='fin'?'Área financeira — gerência':'Confirme sua identidade para zerar o sistema';
+  document.getElementById('senha-desc').textContent=ctx==='fin'?'Digite o PIN para destravar':'Confirme o PIN para zerar o sistema';
   document.getElementById('senha-modal').classList.add('open');
   setTimeout(()=>document.getElementById('senha-inp').focus(),200);
 }
@@ -1439,59 +1492,52 @@ function fecharSenha(){
   document.getElementById('senha-modal').classList.remove('open');
 }
 
-async function confirmarSenha(){
-  const email = document.getElementById('login-email').value.trim();
-  const pwd = document.getElementById('senha-inp').value;
-
-  if(!email || !pwd){
-    toast('Preencha e-mail e senha','err'); 
+function confirmarSenha(){
+  const inputPin = document.getElementById('senha-inp').value;
+  
+  if(inputPin !== senhaAdmin){
+    toast('PIN incorreto!','err');
+    document.getElementById('senha-inp').value='';
     return;
   }
   
-  if(!window.__fbOk || !window.__auth || !window.__fns) {
-    toast('Conecte à internet primeiro!','err');
-    return;
+  fecharSenha();
+  
+  if(senhaCtx==='fin'){
+    document.getElementById('fin-locked').style.display='none';
+    document.getElementById('fin-content').style.display='block';
+    renderFinanceiro();
+    carregarRelatorio(); 
   }
-
-  document.getElementById('senha-inp').disabled = true;
-
-  try {
-    // Faz o login de verdade no servidor do Google
-    await window.__fns.signInWithEmailAndPassword(window.__auth, email, pwd);
-    
-    fecharSenha();
-    toast('Acesso liberado! ✅','ok');
-    
-    if(senhaCtx==='fin'){
-      document.getElementById('fin-locked').style.display='none';
-      document.getElementById('fin-content').style.display='block';
-      renderFinanceiro();
-      carregarRelatorio();
-    }
-    if(senhaCtx==='reset'){
-      localStorage.removeItem('ordens_local');
-      localStorage.removeItem('gastos');
-      filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
-    }
-  } catch(e) {
-    console.error(e);
-    toast('Senha incorreta!','err');
-  } finally {
-    document.getElementById('senha-inp').disabled = false;
-    document.getElementById('senha-inp').value = '';
+  if(senhaCtx==='reset'){
+    localStorage.removeItem('ordens_local');
+    localStorage.removeItem('gastos');
+    filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
   }
 }
 
-function sairGerencia(){
-  if(window.__auth) window.__fns.signOut(window.__auth);
-  toast('Sessão da gerência encerrada 🔒','ok');
-  setTab('nova'); // Expulsa o usuário de volta pra tela de criar OS
+function alterarSenhaAdmin(){
+  const atual=document.getElementById('cfg-senha-atual').value;
+  const nova=document.getElementById('cfg-senha-nova').value.trim();
+  
+  if(!atual||!nova){toast('Preencha os dois campos','err');return;}
+  if(atual!==senhaAdmin){toast('PIN atual incorreto','err');return;}
+  if(nova.length<4){toast('O novo PIN deve ter no mínimo 4 caracteres','err');return;}
+  
+  if(confirm('Deseja realmente alterar o PIN de acesso à gerência?')){
+    senhaAdmin=nova;
+    localStorage.setItem('senha_admin',nova);
+    document.getElementById('cfg-senha-atual').value='';
+    document.getElementById('cfg-senha-nova').value='';
+    toast('PIN alterado com sucesso!','ok');
+  }
 }
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     if(document.getElementById('senha-modal').classList.contains('open'))confirmarSenha();
     if(document.getElementById('confirm-modal').classList.contains('open'))confirmarCancelar();
+    if(document.getElementById('tela-login').classList.contains('show'))fazerLoginApp();
   }
 });
 
