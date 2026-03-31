@@ -4,6 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>Nova Onda — Sistema</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#07111f">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -124,6 +127,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .btn-ghost{background:var(--glass);color:var(--text);border:1px solid var(--border)}
 .btn-success{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;box-shadow:0 4px 14px rgba(46,125,50,.4)}
 .btn-danger{background:linear-gradient(135deg,#c62828,#ef5350);color:#fff}
+.btn-print{background:rgba(21,101,192,.25);color:var(--accent);border:1px solid rgba(41,182,246,.35)}
 .btn-sm{padding:8px 13px;font-size:12px;width:auto}
 .btn-xs{padding:6px 10px;font-size:11px;width:auto}
 
@@ -257,6 +261,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   background:rgba(0,0,0,.88);align-items:center;justify-content:center;
   padding:20px;backdrop-filter:blur(8px)}
 #ticket-modal.open{display:flex;animation:fadeUp .3s ease}
+#ticket-wrap{background:#fff;color:#000;border-radius:10px;width:100%;max-width:320px;
+  font-family:'Courier New',monospace;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 
 /* Confirm modal */
 #confirm-modal{display:none;position:fixed;inset:0;z-index:110;
@@ -313,6 +319,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 </style>
 </head>
 <body>
+<div id="pwa-install-banner" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);padding:18px;border-radius:16px;z-index:9999;width:90%;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,0.6);backdrop-filter:blur(14px);text-align:center">
+  <div style="font-size:32px;margin-bottom:8px">📱</div>
+  <h3 style="font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:6px;color:var(--text)">Instalar App Nova Onda</h3>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Instale o sistema no seu celular para acesso rápido e funcionamento offline sem usar o navegador.</p>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-ghost" onclick="fecharInstall()" style="flex:1;font-size:14px;padding:10px">Depois</button>
+    <button class="btn btn-cyan" onclick="instalarApp()" style="flex:1;font-size:14px;padding:10px">Instalar</button>
+  </div>
+</div>
 <div id="app">
 
 <header>
@@ -325,10 +340,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <button class="active" onclick="setTab('nova')">＋ LavaOS</button>
   <button class="borra-tab" onclick="setTab('borra')">🔧 BorraOS</button>
   <button onclick="setTab('fila')">📋 Fila</button>
-  <button onclick="setTab('financeiro')">💼 Gerência</button>
+  <button onclick="setTab('relatorio')">📊 Relatório</button>
+  <button onclick="setTab('financeiro')">💰 Financeiro</button>
   <button onclick="setTab('config')">⚙ Config</button>
 </nav>
 
+<!-- ══════════════ LAVA OS ══════════════ -->
 <div id="view-nova" class="view active">
   <div class="card">
     <div class="card-title">Leitura de Placa</div>
@@ -373,6 +390,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div style="height:32px"></div>
 </div>
 
+<!-- ══════════════ BORRA OS ══════════════ -->
 <div id="view-borra" class="view">
   <div class="card" style="border-color:rgba(245,158,11,.25)">
     <div class="card-title amber">🔧 Leitura de Placa</div>
@@ -416,6 +434,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div style="height:32px"></div>
 </div>
 
+<!-- ══════════════ FILA ══════════════ -->
 <div id="view-fila" class="view">
   <div class="section-hd">
     <h2>Fila do Dia</h2>
@@ -433,118 +452,114 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div id="fila-list"></div>
 </div>
 
+<!-- ══════════════ RELATÓRIO ══════════════ -->
+<div id="view-relatorio" class="view">
+  <div class="section-hd"><h2>Relatório</h2></div>
+  <div class="rel-tabs">
+    <button class="rel-tab active-lava" id="rel-tab-lava" onclick="setRelTab('lava')">🚗 Lava Rápido</button>
+    <button class="rel-tab" id="rel-tab-borra" onclick="setRelTab('borra')">🔧 Borracharia</button>
+  </div>
+  <div class="filter-row" id="rel-filter-row">
+    <div class="fpill active" onclick="setRelPeriodo('hoje',this)">Hoje</div>
+    <div class="fpill" onclick="setRelPeriodo('semana',this)">Semana</div>
+    <div class="fpill" onclick="setRelPeriodo('mes',this)">Mês</div>
+    <div class="fpill" onclick="setRelPeriodo('ano',this)">Ano</div>
+    <div class="fpill" onclick="setRelPeriodo('custom',this)">📅 Data</div>
+  </div>
+  <div id="custom-date-row" style="display:none;gap:8px;margin-bottom:14px">
+    <input type="date" id="rel-data-ini" style="flex:1"/>
+    <input type="date" id="rel-data-fim" style="flex:1"/>
+    <button class="btn btn-ghost btn-sm" onclick="carregarRelatorio()">OK</button>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="rel-qtd">0</div><div class="stat-lbl">Serviços</div></div>
+    <div class="stat-card"><div class="stat-val" id="rel-rec" style="font-size:15px">R$0</div><div class="stat-lbl">Receita</div></div>
+    <div class="stat-card"><div class="stat-val" id="rel-tick" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="rel-chart-title">Receita por Dia</div>
+    <div class="chart-wrap"><canvas id="chart-receita"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="rel-rank-title">🏆 Ranking Lavadores</div>
+    <div class="filter-row">
+      <div class="fpill" onclick="setRankPeriodo('hoje',this)">Hoje</div>
+      <div class="fpill active" onclick="setRankPeriodo('semana',this)">Semana</div>
+      <div class="fpill" onclick="setRankPeriodo('mes',this)">Mês</div>
+    </div>
+    <div id="ranking-list"></div>
+  </div>
+  <div class="card" id="rel-servicos-card" style="display:none">
+    <div class="card-title amber">📊 Serviços Mais Realizados</div>
+    <div id="servicos-borra-list"></div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="rel-hist-title">Histórico de OS</div>
+    <div id="hist-list"></div>
+  </div>
+</div>
 
+<!-- ══════════════ FINANCEIRO ══════════════ -->
 <div id="view-financeiro" class="view">
   <div id="fin-locked" style="text-align:center;padding:60px 20px">
     <div style="font-size:52px;margin-bottom:12px">🔒</div>
     <p style="color:var(--muted);margin-bottom:20px">Área restrita — gerência</p>
     <button class="btn btn-primary" style="max-width:280px;margin:0 auto" onclick="pedirSenha('fin')">Entrar com senha</button>
   </div>
-
   <div id="fin-content" style="display:none">
-    
-    <div class="sub-tabs" style="margin-bottom:14px">
-      <button class="sub-tab active-lava" id="fin-tab-geral" onclick="setFinSubTab('geral')">💰 Financeiro</button>
-      <button class="sub-tab" id="fin-tab-rel" onclick="setFinSubTab('rel')">📊 Relatórios</button>
+    <div class="card">
+      <div class="card-title">Lançar Gasto</div>
+      <div class="ig"><label>Categoria</label>
+        <select id="fin-cat">
+          <option value="agua">💧 Água</option><option value="energia">⚡ Energia</option>
+          <option value="produto">🧴 Produto</option><option value="salario">👷 Salário</option>
+          <option value="outros">📦 Outros</option>
+        </select>
+      </div>
+      <div class="ig"><label>Descrição</label><input id="fin-desc" type="text" placeholder="Ex: conta de água março…"/></div>
+      <div class="ig"><label>Valor</label><input id="fin-valor" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01"/></div>
+      <button class="btn btn-primary" onclick="lancarGasto()">💾 Lançar Gasto</button>
     </div>
-
-    <div id="fin-geral-wrap">
-      <div class="card">
-        <div class="card-title">Lançar Gasto</div>
-        <div class="ig"><label>Categoria</label>
-          <select id="fin-cat">
-            <option value="agua">💧 Água</option><option value="energia">⚡ Energia</option>
-            <option value="produto">🧴 Produto</option><option value="salario">👷 Salário</option>
-            <option value="outros">📦 Outros</option>
-          </select>
-        </div>
-        <div class="ig"><label>Descrição</label><input id="fin-desc" type="text" placeholder="Ex: conta de água março…"/></div>
-        <div class="ig"><label>Valor</label><input id="fin-valor" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01"/></div>
-        <button class="btn btn-primary" onclick="lancarGasto()">💾 Lançar Gasto</button>
-      </div>
-      <div class="filter-row" id="fin-filter-row">
-        <div class="fpill active" onclick="setFinPeriodo('hoje',this)">Hoje</div>
-        <div class="fpill" onclick="setFinPeriodo('semana',this)">Semana</div>
-        <div class="fpill" onclick="setFinPeriodo('mes',this)">Mês</div>
-        <div class="fpill" onclick="setFinPeriodo('ano',this)">Ano</div>
-        <div class="fpill" onclick="setFinPeriodo('custom',this)">📅 Data</div>
-      </div>
-      <div id="fin-custom-row" style="display:none;gap:8px;margin-bottom:14px">
-        <input type="date" id="fin-data-ini" style="flex:1"/>
-        <input type="date" id="fin-data-fim" style="flex:1"/>
-        <button class="btn btn-ghost btn-sm" onclick="renderFinanceiro()">OK</button>
-      </div>
-      <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
-        <div class="stat-card"><div class="stat-val" id="fin-receita" style="color:#66bb6a;font-size:15px">R$0</div><div class="stat-lbl">Receita Total</div></div>
-        <div class="stat-card"><div class="stat-val" id="fin-gastos" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gastos Total</div></div>
-      </div>
-      <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
-        <div class="stat-card"><div class="stat-val" id="fin-lucro" style="font-size:15px">R$0</div><div class="stat-lbl">Lucro Líquido</div></div>
-        <div class="stat-card"><div class="stat-val" id="fin-margem" style="font-size:18px">0%</div><div class="stat-lbl">Margem de Lucro</div></div>
-      </div>
-      <div class="stats-row">
-        <div class="stat-card"><div class="stat-val" id="fin-qtd-os" style="font-size:18px">0</div><div class="stat-lbl">Total OS</div></div>
-        <div class="stat-card"><div class="stat-val" id="fin-ticket-med" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
-        <div class="stat-card"><div class="stat-val" id="fin-gasto-med" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gasto Médio/dia</div></div>
-      </div>
-      <div class="card"><div class="card-title">Receita vs Gastos por Categoria</div>
-        <div class="chart-wrap"><canvas id="chart-gastos"></canvas></div>
-      </div>
-      <div class="card" id="fin-dist-card">
-        <div class="card-title">Distribuição de Gastos (%)</div>
-        <div id="fin-dist-list"></div>
-      </div>
-      <div class="card"><div class="card-title">Histórico de Gastos</div><div id="fin-hist"></div></div>
+    <div class="filter-row" id="fin-filter-row">
+      <div class="fpill active" onclick="setFinPeriodo('hoje',this)">Hoje</div>
+      <div class="fpill" onclick="setFinPeriodo('semana',this)">Semana</div>
+      <div class="fpill" onclick="setFinPeriodo('mes',this)">Mês</div>
+      <div class="fpill" onclick="setFinPeriodo('ano',this)">Ano</div>
+      <div class="fpill" onclick="setFinPeriodo('custom',this)">📅 Data</div>
     </div>
-
-    <div id="fin-rel-wrap" style="display:none">
-      <div class="rel-tabs">
-        <button class="rel-tab active-lava" id="rel-tab-lava" onclick="setRelTab('lava')">🚗 Lava Rápido</button>
-        <button class="rel-tab" id="rel-tab-borra" onclick="setRelTab('borra')">🔧 Borracharia</button>
-      </div>
-      <div class="filter-row" id="rel-filter-row">
-        <div class="fpill active" onclick="setRelPeriodo('hoje',this)">Hoje</div>
-        <div class="fpill" onclick="setRelPeriodo('semana',this)">Semana</div>
-        <div class="fpill" onclick="setRelPeriodo('mes',this)">Mês</div>
-        <div class="fpill" onclick="setRelPeriodo('ano',this)">Ano</div>
-        <div class="fpill" onclick="setRelPeriodo('custom',this)">📅 Data</div>
-      </div>
-      <div id="custom-date-row" style="display:none;gap:8px;margin-bottom:14px">
-        <input type="date" id="rel-data-ini" style="flex:1"/>
-        <input type="date" id="rel-data-fim" style="flex:1"/>
-        <button class="btn btn-ghost btn-sm" onclick="carregarRelatorio()">OK</button>
-      </div>
-      <div class="stats-row">
-        <div class="stat-card"><div class="stat-val" id="rel-qtd">0</div><div class="stat-lbl">Serviços</div></div>
-        <div class="stat-card"><div class="stat-val" id="rel-rec" style="font-size:15px">R$0</div><div class="stat-lbl">Receita</div></div>
-        <div class="stat-card"><div class="stat-val" id="rel-tick" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title" id="rel-chart-title">Receita por Dia</div>
-        <div class="chart-wrap"><canvas id="chart-receita"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title" id="rel-rank-title">🏆 Ranking Lavadores</div>
-        <div class="filter-row">
-          <div class="fpill" onclick="setRankPeriodo('hoje',this)">Hoje</div>
-          <div class="fpill active" onclick="setRankPeriodo('semana',this)">Semana</div>
-          <div class="fpill" onclick="setRankPeriodo('mes',this)">Mês</div>
-        </div>
-        <div id="ranking-list"></div>
-      </div>
-      <div class="card" id="rel-servicos-card" style="display:none">
-        <div class="card-title amber">📊 Serviços Mais Realizados</div>
-        <div id="servicos-borra-list"></div>
-      </div>
-      <div class="card">
-        <div class="card-title" id="rel-hist-title">Histórico de OS</div>
-        <div id="hist-list"></div>
-      </div>
+    <div id="fin-custom-row" style="display:none;gap:8px;margin-bottom:14px">
+      <input type="date" id="fin-data-ini" style="flex:1"/>
+      <input type="date" id="fin-data-fim" style="flex:1"/>
+      <button class="btn btn-ghost btn-sm" onclick="renderFinanceiro()">OK</button>
     </div>
-
+    <!-- Cards stats expandidos -->
+    <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat-card"><div class="stat-val" id="fin-receita" style="color:#66bb6a;font-size:15px">R$0</div><div class="stat-lbl">Receita Total</div></div>
+      <div class="stat-card"><div class="stat-val" id="fin-gastos" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gastos Total</div></div>
+    </div>
+    <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat-card"><div class="stat-val" id="fin-lucro" style="font-size:15px">R$0</div><div class="stat-lbl">Lucro Líquido</div></div>
+      <div class="stat-card"><div class="stat-val" id="fin-margem" style="font-size:18px">0%</div><div class="stat-lbl">Margem de Lucro</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val" id="fin-qtd-os" style="font-size:18px">0</div><div class="stat-lbl">Total OS</div></div>
+      <div class="stat-card"><div class="stat-val" id="fin-ticket-med" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
+      <div class="stat-card"><div class="stat-val" id="fin-gasto-med" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gasto Médio/dia</div></div>
+    </div>
+    <!-- Gráficos lado a lado -->
+    <div class="card"><div class="card-title">Receita vs Gastos por Categoria</div>
+      <div class="chart-wrap"><canvas id="chart-gastos"></canvas></div>
+    </div>
+    <!-- Distribuição de gastos em % -->
+    <div class="card" id="fin-dist-card">
+      <div class="card-title">Distribuição de Gastos (%)</div>
+      <div id="fin-dist-list"></div>
+    </div>
+    <div class="card"><div class="card-title">Histórico de Gastos</div><div id="fin-hist"></div></div>
   </div>
 </div>
 
+<!-- ══════════════ CONFIG ══════════════ -->
 <div id="view-config" class="view">
   <div class="card">
     <div class="card-title">Estabelecimento</div>
@@ -553,14 +568,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <div class="ig"><label>Telefone</label><input id="cfg-tel" type="tel"/></div>
     <button class="btn btn-primary" onclick="salvarCfg()">💾 Salvar</button>
   </div>
-  
-  <div class="card">
-    <div class="card-title">🔐 Senha da Gerência</div>
-    <div class="ig"><label>Senha Atual</label><input id="cfg-senha-atual" type="password" placeholder="Digite a senha atual"/></div>
-    <div class="ig"><label>Nova Senha</label><input id="cfg-senha-nova" type="password" placeholder="Nova senha (mínimo 4 caracteres)"/></div>
-    <button class="btn btn-primary" onclick="alterarSenhaAdmin()">💾 Alterar Senha</button>
-  </div>
-
   <div class="card">
     <div class="card-title">Tema do App</div>
     <div class="theme-opts">
@@ -589,6 +596,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 </div>
 </div>
 
+<!-- TICKET MODAL -->
 <div id="ticket-modal">
   <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px">
     <div id="ticket-wrap" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)"></div>
@@ -597,6 +605,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   </div>
 </div>
 
+<!-- CONFIRM MODAL -->
 <div id="confirm-modal">
   <div class="confirm-box">
     <div class="icon">⚠️</div>
@@ -609,6 +618,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   </div>
 </div>
 
+<!-- SENHA MODAL -->
 <div id="senha-modal">
   <div class="senha-box">
     <div style="font-size:40px;margin-bottom:10px">🔐</div>
@@ -626,10 +636,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 
 <script>
 // ════════════════════════════════════════
-// CONSTANTES & SENHA DINÂMICA
+// CONSTANTES
 // ════════════════════════════════════════
-let senhaAdmin    = localStorage.getItem('senha_admin') || 'masternovaonda';
-
+const SENHA       = 'masternovaonda';
 const LAV_LAVA    = ['João Pedro','Litio','Samuel','Cleber','Glauber','Cleberson','Gustavo','Avulso'];
 const LAV_BORRA   = ['Andrei','João Pedro','Avulso'];
 const VALS_RAP    = [15,20,25,30,40,50,60,80,100,120,150,200];
@@ -667,7 +676,7 @@ function setDb(ok){
 // TABS
 // ════════════════════════════════════════
 function setTab(t){
-  // Tranca financeiro/relatório ao sair
+  // Tranca financeiro ao sair
   if(t!=='financeiro'){
     document.getElementById('fin-locked').style.display='block';
     document.getElementById('fin-content').style.display='none';
@@ -676,21 +685,11 @@ function setTab(t){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+t).classList.add('active');
   const btns=document.querySelectorAll('nav.tabs button');
-  const idx={nova:0,borra:1,fila:2,financeiro:3,config:4};
+  const idx={nova:0,borra:1,fila:2,relatorio:3,financeiro:4,config:5};
   btns[idx[t]].classList.add('active');
-  
   if(t==='fila')      carregarFila();
+  if(t==='relatorio') carregarRelatorio();
   if(t==='config')    {loadCfg();renderCfgTipos();}
-}
-
-function setFinSubTab(tab){
-  document.getElementById('fin-geral-wrap').style.display = tab==='geral' ? 'block' : 'none';
-  document.getElementById('fin-rel-wrap').style.display = tab==='rel' ? 'block' : 'none';
-  document.getElementById('fin-tab-geral').className = 'sub-tab' + (tab==='geral' ? ' active-lava' : '');
-  document.getElementById('fin-tab-rel').className = 'sub-tab' + (tab==='rel' ? ' active-lava' : '');
-  
-  if(tab==='rel') carregarRelatorio();
-  if(tab==='geral') renderFinanceiro();
 }
 
 // ════════════════════════════════════════
@@ -958,33 +957,39 @@ function mostrarTicket(os){
 <div style="width:100%;max-width:58mm;box-sizing:border-box;padding:2mm;font-family:'Courier New',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">
   <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:3mm;margin-bottom:3mm">
     <div style="font-size:9.5pt;font-weight:900;letter-spacing:0">${(os.nomeEstab||'NOVA ONDA').toUpperCase()}</div>
+    
     <div style="font-size:7.5pt;font-weight:bold">${isBorra?'BORRACHARIA':'LAVA RÁPIDO &amp; BORRACHARIA'}</div>
     ${os.end?`<div style="font-size:7.5pt;font-weight:bold">${os.end}</div>`:''}
     ${os.tel?`<div style="font-size:7.5pt;font-weight:bold">Tel: ${os.tel}</div>`:''}
   </div>
+  
   <div style="text-align:center;margin-bottom:3mm">
     <div style="font-size:7pt;letter-spacing:1px;font-weight:bold">${isBorra?'OS BORRACHARIA':'ORDEM DE SERVICO'}</div>
     <div style="font-size:10pt;font-weight:900">#${os.numero}</div>
     <div style="font-size:7pt;font-weight:bold">${data} ${hora}</div>
   </div>
+  
   <div style="border:2px solid #000;padding:2mm;text-align:center;margin-bottom:3mm${isBorra?';background:#fffbeb':''}">
     <div style="font-size:7pt;letter-spacing:1px;margin-bottom:1mm;font-weight:bold">PLACA</div>
     <div style="font-size:22pt;font-weight:900;letter-spacing:4px;line-height:1">${os.placa}</div>
   </div>
+  
   <div style="border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm">
     <div style="display:flex;justify-content:space-between"><span>Servico</span><span style="font-weight:700;text-align:right;max-width:55%;font-size:8pt">${os.tipo}</span></div>
     <div style="display:flex;justify-content:space-between"><span>${isBorra?'Borracheiro':'Lavador'}</span><span style="font-weight:700">${os.lavador||'—'}</span></div>
     ${os.obs?`<div style="font-size:7pt;margin-top:1mm;font-weight:bold">Obs: ${os.obs}</div>`:''}
   </div>
+  
   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2mm">
     <span style="font-size:10pt;font-weight:900">TOTAL</span>
     <span style="font-size:16pt;font-weight:900">R$ ${Number(os.valor).toFixed(2).replace('.',',')}</span>
   </div>
+  
   <div style="border:1px solid #000;text-align:center;padding:1mm">
     <div style="font-size:7pt;font-weight:bold">STATUS</div>
     <div style="font-size:10pt;font-weight:900">*** AGUARDANDO ***</div>
   </div>
-</div>`;
+  </div>`;
   document.getElementById('ticket-modal').classList.add('open');
 }
 function fecharTicket(){document.getElementById('ticket-modal').classList.remove('open');}
@@ -1054,9 +1059,9 @@ function renderFila(){
         <div class="spill ${os.status||'aguardando'}">${conc?'PRONTO':'LAVANDO'}</div>
       </div>
       <div class="os-row-bot">
-        ${!conc?`<button class="btn btn-success btn-xs" onclick="finalizarOS('${os.numero}',event)">✓ Finalizar</button>`:''}
+        ${!conc?('<button class="btn btn-success btn-xs" onclick="finalizarOS(\''+os.numero+'\',event)">✓ Finalizar</button>'):''}
         <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();mostrarTicketById('${os.numero}')">🖨</button>
-        ${!conc?`<button class="btn btn-danger btn-xs" style="margin-left:auto" onclick="pedirCancelar('${os.numero}',event)">✕ Cancelar</button>`:''}
+        ${!conc?('<button class="btn btn-danger btn-xs" style="margin-left:auto" onclick="pedirCancelar(\''+os.numero+'\',event)">✕ Cancelar</button>'):''}
       </div>`;
     el.appendChild(item);
   });
@@ -1100,7 +1105,7 @@ function confirmarCancelar(){
 }
 
 // ════════════════════════════════════════
-// RELATÓRIOS (DENTRO DA GERÊNCIA)
+// RELATÓRIO
 // ════════════════════════════════════════
 function setRelTab(tab){
   relTab=tab;
@@ -1363,7 +1368,7 @@ function filtrarPorPeriodo(p,items){
 }
 
 // ════════════════════════════════════════
-// SENHA E SEGURANÇA
+// SENHA
 // ════════════════════════════════════════
 function pedirSenha(ctx){
   senhaCtx=ctx;
@@ -1374,32 +1379,11 @@ function pedirSenha(ctx){
 }
 function fecharSenha(){document.getElementById('senha-modal').classList.remove('open');}
 function confirmarSenha(){
-  if(document.getElementById('senha-inp').value!==senhaAdmin){toast('Senha incorreta','err');document.getElementById('senha-inp').value='';return;}
+  if(document.getElementById('senha-inp').value!==SENHA){toast('Senha incorreta','err');document.getElementById('senha-inp').value='';return;}
   fecharSenha();
-  if(senhaCtx==='fin'){
-    document.getElementById('fin-locked').style.display='none';
-    document.getElementById('fin-content').style.display='block';
-    renderFinanceiro();
-    carregarRelatorio(); 
-  }
+  if(senhaCtx==='fin'){document.getElementById('fin-locked').style.display='none';document.getElementById('fin-content').style.display='block';renderFinanceiro();}
   if(senhaCtx==='reset'){localStorage.removeItem('ordens_local');localStorage.removeItem('gastos');filaCache=[];renderFila();toast('Sistema zerado!','ok');}
 }
-
-function alterarSenhaAdmin(){
-  const atual=document.getElementById('cfg-senha-atual').value;
-  const nova=document.getElementById('cfg-senha-nova').value.trim();
-  if(!atual||!nova){toast('Preencha os dois campos','err');return;}
-  if(atual!==senhaAdmin){toast('Senha atual incorreta','err');return;}
-  if(nova.length<4){toast('A nova senha deve ter no mínimo 4 caracteres','err');return;}
-  if(confirm('Deseja realmente alterar a senha de acesso à gerência?')){
-    senhaAdmin=nova;
-    localStorage.setItem('senha_admin',nova);
-    document.getElementById('cfg-senha-atual').value='';
-    document.getElementById('cfg-senha-nova').value='';
-    toast('Senha alterada com sucesso!','ok');
-  }
-}
-
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     if(document.getElementById('senha-modal').classList.contains('open'))confirmarSenha();
@@ -1455,6 +1439,37 @@ renderVals('chips-vals');
 renderVals('chips-vals-borra');
 loadCfg();
 document.getElementById('novo-tipo').addEventListener('keydown',e=>{if(e.key==='Enter')addTipo();});
+
+// ════════════════════════════════════════
+// PWA - INSTALAÇÃO E SERVICE WORKER
+// ════════════════════════════════════════
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // Impede o aviso padrão do celular
+  deferredPrompt = e; // Guarda o evento
+  document.getElementById('pwa-install-banner').style.display = 'block'; // Mostra o nosso banner
+});
+
+function fecharInstall() {
+  document.getElementById('pwa-install-banner').style.display = 'none';
+}
+
+async function instalarApp() {
+  if (deferredPrompt) {
+    fecharInstall();
+    deferredPrompt.prompt(); // Mostra a tela nativa de instalação do Android
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') console.log('App instalado com sucesso!');
+    deferredPrompt = null;
+  }
+}
+
+// Registra o Service Worker para cache e offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('Falha no SW:', err));
+  });
+}
 </script>
 </body>
 </html>
