@@ -863,7 +863,6 @@ function iniciarOCR(ctx){
     
     ocrBusy=true; st.textContent='🔍 Lendo placa...';
     
-    // Pega a resolução real do vídeo
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
@@ -872,67 +871,73 @@ function iniciarOCR(ctx){
     const ctx2d = c.getContext('2d');
     ctx2d.drawImage(video,0,0,vw,vh);
     
-    // A caixa na tela tem exatamente 76% de largura e 54% de altura (alinhado com o CSS .sf)
-    const cropW = vw * 0.76;
-    const cropH = vh * 0.54;
-    const cropX = (vw - cropW) / 2;
-    const cropY = (vh - cropH) / 2;
+    // Regiões de busca (da mais ampla para a mais focada)
+    const regioes=[
+      [0.05, 0.15, 0.90, 0.70], // Ampla
+      [0.10, 0.25, 0.80, 0.50], // Média
+      [0.12, 0.23, 0.76, 0.54]  // Focada
+    ];
     
-    const crop=document.createElement('canvas');
-    // Aumentar a escala (* 1.5) ajuda o Tesseract a ler letras pequenas melhor
-    crop.width = cropW * 1.5;
-    crop.height = cropH * 1.5;
-    const cCtx=crop.getContext('2d');
+    let detectada = null;
+
+    for(const[rx, ry, rw, rh] of regioes){
+      if(detectada) break;
+      
+      const cropW = vw * rw;
+      const cropH = vh * rh;
+      const cropX = vw * rx;
+      const cropY = vh * ry;
+      
+      const crop=document.createElement('canvas');
+      crop.width = cropW;
+      crop.height = cropH;
+      const cCtx=crop.getContext('2d');
+      
+      cCtx.filter = 'contrast(1.4) brightness(1.1) grayscale(1)';
+      cCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
+      
+      try{
+        const {data:{text}} = await ocrWorker.recognize(crop);
+        let clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
+
+        if(clean.length >= 7) {
+           for(let i=0; i <= clean.length - 7; i++){
+              let trecho = clean.substring(i, i+7);
+              let arr = trecho.split('');
+              
+              // AUTO CORRETOR INTELIGENTE
+              const toL = (char) => ({'0':'O','1':'I','5':'S','8':'B','2':'Z'})[char] || char;
+              const toN = (char) => ({'O':'0','I':'1','S':'5','B':'8','Z':'2','G':'6'})[char] || char;
+
+              arr[0] = toL(arr[0]);
+              arr[1] = toL(arr[1]);
+              arr[2] = toL(arr[2]);
+              arr[3] = toN(arr[3]);
+              // arr[4] pode ser letra ou número no Mercosul
+              arr[5] = toN(arr[5]);
+              arr[6] = toN(arr[6]);
+
+              let finalPlaca = arr.join('');
+
+              if(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(finalPlaca)) {
+                 detectada = finalPlaca;
+                 break;
+              }
+           }
+        }
+      }catch(e){}
+    }
     
-    // Filtros pesados para ressaltar as letras (preto e branco super contrastado)
-    cCtx.filter = 'contrast(2) brightness(1.3) grayscale(1)';
-    cCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
-    
-    try{
-      const {data:{text}} = await ocrWorker.recognize(crop);
-      // Limpa tudo que não é letra ou número
-      let clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
-
-      // Se encontrou algo com pelo menos 7 caracteres
-      if(clean.length >= 7) {
-         // Procura um padrão de 7 caracteres solto no meio da sujeira
-         let placa = clean.match(/[A-Z0-9]{7}/);
-         if(placa) {
-            placa = placa[0];
-            
-            // Força o padrão Brasil (Corrige confusões comuns do Tesseract como O/0, I/1, S/5)
-            let arr = placa.split('');
-
-            const toLetter = (c) => ({'0':'O','1':'I','5':'S','8':'B','2':'Z'})[c] || c;
-            const toNumber = (c) => ({'O':'0','I':'1','S':'5','B':'8','Z':'2','G':'6'})[c] || c;
-
-            // Posição 0,1,2 = Letras obrigatórias
-            arr[0] = toLetter(arr[0]);
-            arr[1] = toLetter(arr[1]);
-            arr[2] = toLetter(arr[2]);
-            // Posição 3 = Número obrigatório
-            arr[3] = toNumber(arr[3]);
-            // Posição 4 = Letra ou Número (deixa do jeito que a IA leu)
-            // Posição 5,6 = Números obrigatórios
-            arr[5] = toNumber(arr[5]);
-            arr[6] = toNumber(arr[6]);
-
-            const finalPlaca = arr.join('');
-
-            // Valida se ficou no padrão correto LLLNLNN (Mercosul) ou LLLNNNN (Antiga)
-            if(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(finalPlaca)) {
-               document.getElementById(placaId).value = finalPlaca;
-               st.textContent='✅ ' + finalPlaca;
-               toast('✅ Placa: ' + finalPlaca,'ok');
-               setTimeout(stopCam,700);
-               return;
-            }
-         }
-      }
-    }catch(e){}
+    if(detectada){
+       document.getElementById(placaId).value = detectada;
+       st.textContent='✅ ' + detectada;
+       toast('✅ Placa: ' + detectada,'ok');
+       setTimeout(stopCam,700);
+       return;
+    }
     
     st.textContent='Aponte para a placa…';
-    ocrBusy=false; ocrTimer=setTimeout(loop,500); // Tenta de novo rápido
+    ocrBusy=false; ocrTimer=setTimeout(loop,500);
   }
   setTimeout(loop,800);
 }
