@@ -587,9 +587,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 <!-- TICKET MODAL -->
 <div id="ticket-modal">
   <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px">
-    <div id="ticket-wrap"></div>
-    <button class="btn btn-print no-print" onclick="window.print()">🖨 Imprimir</button>
-    <button class="btn btn-ghost no-print" onclick="fecharTicket()">✕ Fechar</button>
+    <div id="ticket-wrap" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)"></div>
+    <button class="btn btn-cyan no-print" onclick="window.print()" style="font-size:16px;padding:16px;margin-top:8px">🖨 Imprimir Ticket</button>
+    <button class="btn no-print" onclick="fecharTicket()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);font-size:16px;padding:16px">✕ Fechar</button>
   </div>
 </div>
 
