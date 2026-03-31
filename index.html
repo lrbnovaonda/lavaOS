@@ -163,7 +163,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .btn-sm{padding:8px 13px;font-size:12px;width:auto}
 .btn-xs{padding:6px 10px;font-size:11px;width:auto}
 
-/* Camera - MIRA FENDA FINA */
+/* Camera */
 #cam-wrap,#cam-wrap-b{display:none;margin-bottom:14px;border-radius:var(--r);overflow:hidden;
   border:1px solid var(--border);position:relative;background:#000;aspect-ratio:16/9}
 .cam-video{width:100%;height:100%;object-fit:cover;display:block}
@@ -544,7 +544,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         <button class="btn btn-ghost btn-sm" onclick="renderFinanceiro()">OK</button>
       </div>
       <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
-        <div class="stat-card"><div class="stat-val" id="fin-receita" style="color:#66bb6a;font-size:15px">R$0</div><div class="stat-lbl">Receita Total</div></div>
+        <div class="stat-card"><div class="stat-val" id="fin-receita" style="color:#66bb6a;font-size:15px">R$0</div><div class="stat-lbl">Receita (Finalizadas)</div></div>
         <div class="stat-card"><div class="stat-val" id="fin-gastos" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gastos Total</div></div>
       </div>
       <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
@@ -552,7 +552,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         <div class="stat-card"><div class="stat-val" id="fin-margem" style="font-size:18px">0%</div><div class="stat-lbl">Margem de Lucro</div></div>
       </div>
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-val" id="fin-qtd-os" style="font-size:18px">0</div><div class="stat-lbl">Total OS</div></div>
+        <div class="stat-card"><div class="stat-val" id="fin-qtd-os" style="font-size:18px">0</div><div class="stat-lbl">OS Finalizadas</div></div>
         <div class="stat-card"><div class="stat-val" id="fin-ticket-med" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
         <div class="stat-card"><div class="stat-val" id="fin-gasto-med" style="color:#ff5252;font-size:15px">R$0</div><div class="stat-lbl">Gasto Médio/dia</div></div>
       </div>
@@ -584,7 +584,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         <button class="btn btn-ghost btn-sm" onclick="carregarRelatorio()">OK</button>
       </div>
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-val" id="rel-qtd">0</div><div class="stat-lbl">Serviços</div></div>
+        <div class="stat-card"><div class="stat-val" id="rel-qtd">0</div><div class="stat-lbl">OS Finalizadas</div></div>
         <div class="stat-card"><div class="stat-val" id="rel-rec" style="font-size:15px">R$0</div><div class="stat-lbl">Receita</div></div>
         <div class="stat-card"><div class="stat-val" id="rel-tick" style="font-size:15px">R$0</div><div class="stat-lbl">Ticket Médio</div></div>
       </div>
@@ -606,7 +606,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
         <div id="servicos-borra-list"></div>
       </div>
       <div class="card">
-        <div class="card-title" id="rel-hist-title">Histórico de OS</div>
+        <div class="card-title" id="rel-hist-title">Histórico de OS Finalizadas</div>
         <div id="hist-list"></div>
       </div>
     </div>
@@ -724,6 +724,7 @@ let senhaCtx=null,cancelPendingNum=null;
 
 let ocrWorker = null;
 let ocrInitializing = false;
+let cofreAberto = false; // TRAVA DE SEGURANÇA CORRIGIDA
 
 // ════════════════════════════════════════
 // FIREBASE, SINCRONIZAÇÃO E LOGIN NO APP
@@ -748,26 +749,37 @@ window.syncCentral = async function() {
     const fbOrdens=[]; 
     snap.forEach(d=>{
         let dt = d.data();
-        // FORMATAÇÃO CORRETA DA DATA DA NUVEM ANTES DE SALVAR (Cura o bug do Relatório Vazio)
         if(dt.criadoEm && dt.criadoEm.toDate) dt.criadoEm = dt.criadoEm.toDate().toISOString();
         fbOrdens.push({id:d.id, ...dt});
     });
     
-    // 2. Pega os que já estão no celular (mesmo os offline)
+    // 2. Pega celular
     const localOrdens=JSON.parse(localStorage.getItem('ordens_local')||'[]');
     
-    // 3. Junta os dois (A Nuvem sobrepõe qualquer erro local)
+    // 3. Junta os dois preservando datas corretas
     const mapOrdens = new Map();
     localOrdens.forEach(o => {
-        // Se a data quebrou no bug anterior, tenta curar
         if(o.criadoEm && o.criadoEm.seconds) o.criadoEm = new Date(o.criadoEm.seconds * 1000).toISOString();
         mapOrdens.set(o.numero, o);
     });
-    fbOrdens.forEach(o => mapOrdens.set(o.numero, o));
+    fbOrdens.forEach(o => {
+        const loc = mapOrdens.get(o.numero);
+        // CURA DO BUG: Se a nuvem não tiver a data exata (ou for nula), pegue a data salva no celular
+        if (!o.criadoEm || (o.criadoEm && o.criadoEm.includes('1970'))) {
+           if (loc && loc.criadoEm) o.criadoEm = loc.criadoEm;
+           else o.criadoEm = new Date().toISOString(); 
+        }
+        // Se a OS no celular já foi concluída, mas a nuvem ainda diz "aguardando", a conclusão local manda!
+        if (loc && (loc.status === 'concluido' || loc.status === 'cancelado') && o.status === 'aguardando') {
+            o.status = loc.status;
+            if(fbOk&&db&&fns&&o.id) fns.updateDoc(fns.doc(db,'ordens',o.id),{status:loc.status}).catch(()=>{});
+        }
+        mapOrdens.set(o.numero, o);
+    });
     
     localStorage.setItem('ordens_local',JSON.stringify(Array.from(mapOrdens.values()).sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm))));
     
-    // Faz a mesma junção segura com os Gastos
+    // Mesma coisa para Gastos
     const gSnap=await fns.getDocs(fns.query(fns.collection(db,'gastos'),fns.orderBy('criadoEm','desc'),fns.limit(1000)));
     const fbGastos=[]; 
     gSnap.forEach(d=>{
@@ -780,9 +792,12 @@ window.syncCentral = async function() {
     const mapGastos = new Map();
     localGastos.forEach(g => {
         if(g.criadoEm && g.criadoEm.seconds) g.criadoEm = new Date(g.criadoEm.seconds * 1000).toISOString();
-        mapGastos.set(g.criadoEm, g);
+        mapGastos.set(g.desc+g.valor, g);
     });
-    fbGastos.forEach(g => mapGastos.set(g.criadoEm, g));
+    fbGastos.forEach(g => {
+        if(!g.criadoEm || (g.criadoEm && g.criadoEm.includes('1970'))) g.criadoEm = new Date().toISOString();
+        mapGastos.set(g.desc+g.valor, g);
+    });
     
     localStorage.setItem('gastos',JSON.stringify(Array.from(mapGastos.values()).sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm))));
 
@@ -821,7 +836,6 @@ function sairDoApp() {
 // TABS E SUB-TABS
 // ════════════════════════════════════════
 function setTab(t){
-  // Devolveu a trava: Saiu da aba Financeiro, ele ESCONDE os dados até por PIN de novo
   if(t!=='financeiro'){
     document.getElementById('fin-locked').style.display='block';
     document.getElementById('fin-content').style.display='none';
@@ -836,6 +850,22 @@ function setTab(t){
   
   if(t==='fila')      carregarFila();
   if(t==='config')    {loadCfg();renderCfgTipos();renderCfgBorraServs();renderCfgLavLava();renderCfgLavBorra();}
+  
+  if(t==='financeiro'){
+    // SE O COFRE ESTIVER DESTRANCADO, ELE ENTRA. SE NÃO, FICA NA TELA DE PIN.
+    if(cofreAberto){
+      document.getElementById('fin-locked').style.display='none';
+      document.getElementById('fin-content').style.display='block';
+      toast('Sincronizando dados...','');
+      window.syncCentral().then(()=>{
+         renderFinanceiro();
+         carregarRelatorio();
+      });
+    } else {
+      document.getElementById('fin-locked').style.display='block';
+      document.getElementById('fin-content').style.display='none';
+    }
+  }
 }
 
 function setFinSubTab(tab){
@@ -849,9 +879,8 @@ function setFinSubTab(tab){
 }
 
 function trancarGerencia() {
-  document.getElementById('fin-locked').style.display='block';
-  document.getElementById('fin-content').style.display='none';
-  setTab('nova');
+  cofreAberto = false; // Trava o cofre no código
+  setTab('nova'); // Joga o usuário pra fora da tela
   toast('Cofre da gerência trancado 🔒','ok');
 }
 
@@ -870,7 +899,6 @@ async function toggleCam(ctx){
   document.getElementById(wrapId).style.display='block';
   document.getElementById(btnId).textContent='■ Fechar câmera';
 
-  // Inicia a IA apenas uma vez e deixa na memória
   if(!ocrWorker && !ocrInitializing) {
      ocrInitializing = true;
      document.getElementById(stId).textContent = '⏳ Iniciando inteligência...';
@@ -909,7 +937,6 @@ function iniciarOCR(ctx){
   
   async function loop(){
     if(!camOn||camContext!==ctx)return;
-    // Se a IA não carregou ainda, espera
     if(ocrBusy||video.readyState<2||!ocrWorker){ocrTimer=setTimeout(loop,400);return;}
     
     ocrBusy=true; st.textContent='🔍 Lendo placa...';
@@ -922,55 +949,41 @@ function iniciarOCR(ctx){
     const ctx2d = c.getContext('2d');
     ctx2d.drawImage(video,0,0,vw,vh);
     
-    // CORTE CIRÚRGICO DA FENDA (80% largura x 20% altura - bem no meio)
     const cropW = vw * 0.80;
     const cropH = vh * 0.20;
     const cropX = (vw - cropW) / 2;
     const cropY = (vh - cropH) / 2;
     
     const crop=document.createElement('canvas');
-    // Aumentar a resolução da fenda melhora a leitura da IA
     crop.width = cropW * 1.5;
     crop.height = cropH * 1.5;
     const cCtx=crop.getContext('2d');
     
-    // Filtro extremo: Mata luz estourada e sombras, deixa quase preto e branco
     cCtx.filter = 'contrast(2.5) brightness(1.2) grayscale(1)';
     cCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, crop.width, crop.height);
     
     try{
       const {data:{text}} = await ocrWorker.recognize(crop);
-      // Limpa tudo que não for letra e número (tira traços, espaços, sujeiras)
       let clean = text.replace(/[^A-Z0-9]/gi,'').toUpperCase();
 
-      // AUTO-CORRETOR E DESLIZAMENTO
-      // Se a IA leu pelo menos 7 caracteres no meio do lixo (Ex: leu 'BROZH9F6O')
       if(clean.length >= 7) {
          let detectada = null;
-         
-         // Desliza pela palavra de 7 em 7 letras procurando o padrão
          for(let i=0; i <= clean.length - 7; i++){
             let trecho = clean.substring(i, i+7);
             let arr = trecho.split('');
             
-            // Dicionário de correção da IA (O que ela mais confunde)
             const forcaLetra = (char) => ({'0':'O','1':'I','5':'S','8':'B','2':'Z'})[char] || char;
             const forcaNum = (char) => ({'O':'0','I':'1','S':'5','B':'8','Z':'2','G':'6','Q':'0','D':'0'})[char] || char;
 
-            // Formato Placa Brasil: LLL (Letras)
             arr[0] = forcaLetra(arr[0]);
             arr[1] = forcaLetra(arr[1]);
             arr[2] = forcaLetra(arr[2]);
-            // N (Número)
             arr[3] = forcaNum(arr[3]);
-            // A posição 4 pode ser Letra (Mercosul) ou Número (Antiga), não forçamos.
-            // NN (Números)
             arr[5] = forcaNum(arr[5]);
             arr[6] = forcaNum(arr[6]);
 
             let testPlaca = arr.join('');
 
-            // Se o trecho corrigido bater com Mercosul ou Antiga, Achamos!
             if(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(testPlaca)) {
                detectada = testPlaca;
                break;
@@ -1303,7 +1316,7 @@ async function abrirOS(tipo){
   const os={
     placa, lavador, tipo:servicoLabel, valor, obs,
     status:'aguardando', setor:tipo,
-    numero:gerarNum(), criadoEm:new Date().toISOString(),
+    numero:gerarNum(), criadoEm:new Date().toISOString(), // Cria a data segura no formato ISO
     nomeEstab:cfg.nome||'Nova Onda', tel:cfg.tel||'', end:cfg.end||'',
   };
 
@@ -1514,15 +1527,18 @@ window.setRankPeriodo = function(p,el){
   el.className=relTab==='borra'?'fpill active-amber':'fpill active';
   renderRanking(getOrdens(rankPeriodo));
 }
+
+// FILTRA E PEGA SOMENTE AS ORDENS CONCLUÍDAS PARA O FINANCEIRO/RELATÓRIO
 function getOrdens(periodo,all){
   const data=all||JSON.parse(localStorage.getItem('ordens_local')||'[]');
   const setor=relTab;
   const now=new Date();
   return data.filter(o=>{
-    if(o.status==='cancelado')return false;
+    if(o.status !== 'concluido') return false; // SÓ CONTA SE TIVER FINALIZADO!
     if((o.setor||'lava')!==setor)return false;
+    
     const dt=new Date(o.criadoEm?.toDate?o.criadoEm.toDate():o.criadoEm);
-    if(isNaN(dt)) return false; // Impede que erros sujem o cálculo
+    if(isNaN(dt)) return false; 
     
     if(periodo==='hoje')return dt.toDateString()===now.toDateString();
     if(periodo==='semana'){const d=new Date(now);d.setDate(d.getDate()-7);return dt>=d;}
@@ -1611,7 +1627,7 @@ function renderHistorico(ordens){
   if(!sorted.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Nenhuma OS</p>';return;}
   el.innerHTML='';
   sorted.forEach(os=>{
-    const dt=new Date(os.criadoEm?.toDate?os.criadoEm.toDate():os.criadoEm);
+    const dt=new Date(os.criadoEm?.toDate?o.criadoEm.toDate():os.criadoEm);
     if(isNaN(dt)) return;
     const data=dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
     const hora=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -1652,7 +1668,7 @@ window.lancarGasto = function(){
   renderFinanceiro();
 }
 window.renderFinanceiro = function(){
-  const all=JSON.parse(localStorage.getItem('ordens_local')||'[]').filter(o=>o.status!=='cancelado');
+  const all=JSON.parse(localStorage.getItem('ordens_local')||'[]').filter(o=>o.status === 'concluido'); // SÓ CONTA DINHEIRO DE OS FINALIZADA
   const gastos=JSON.parse(localStorage.getItem('gastos')||'[]');
   const ordFilt=filtrarPorPeriodo(finPeriodo,all);
   const gasFilt=filtrarPorPeriodo(finPeriodo,gastos);
@@ -1779,6 +1795,7 @@ window.confirmarSenha = async function(){
   fecharSenha();
   
   if(senhaCtx==='fin'){
+    cofreAberto = true; // ATIVA A TRAVA DO COFRE ABERTO
     document.getElementById('fin-locked').style.display='none';
     document.getElementById('fin-content').style.display='block';
     toast('Sincronizando nuvem...','');
