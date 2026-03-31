@@ -15,7 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, query, orderBy, limit, serverTimestamp }
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, limit, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -37,7 +37,8 @@ try {
   
   window.__db=db;
   window.__auth=auth;
-  window.__fns={collection,addDoc,updateDoc,doc,getDocs,query,orderBy,limit,serverTimestamp, signInWithEmailAndPassword, signOut};
+  // Adicionado o deleteDoc aqui para podermos apagar dados da nuvem
+  window.__fns={collection,addDoc,updateDoc,deleteDoc,doc,getDocs,query,orderBy,limit,serverTimestamp, signInWithEmailAndPassword, signOut};
   
   await getDocs(query(collection(db,'ordens'),orderBy('criadoEm','desc'),limit(1)));
   window.__fbOk=true;
@@ -163,7 +164,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .btn-sm{padding:8px 13px;font-size:12px;width:auto}
 .btn-xs{padding:6px 10px;font-size:11px;width:auto}
 
-/* Camera */
+/* Camera - MIRA FENDA FINA */
 #cam-wrap,#cam-wrap-b{display:none;margin-bottom:14px;border-radius:var(--r);overflow:hidden;
   border:1px solid var(--border);position:relative;background:#000;aspect-ratio:16/9}
 .cam-video{width:100%;height:100%;object-fit:cover;display:block}
@@ -652,8 +653,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     </div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Sua conta do Google está conectada neste aparelho.</p>
     <button class="btn btn-ghost" style="color:#ff4c6a;border-color:rgba(255,76,106,.3);margin-bottom:12px" onclick="sairDoApp()">🔒 Sair do Sistema Geral</button>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">Apaga a memória do aparelho (Atenção: Não apaga a nuvem).</p>
-    <button class="btn btn-danger" onclick="pedirSenha('reset')">🗑 Zerar Base de Dados Local</button>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">Apaga TUDO (Celular e Banco de Dados na Nuvem). Ação irreversível.</p>
+    <button class="btn btn-danger" onclick="pedirSenha('reset')">🗑 Zerar Sistema Completo (Nuvem e Local)</button>
   </div>
 </div>
 </div>
@@ -724,7 +725,7 @@ let senhaCtx=null,cancelPendingNum=null;
 
 let ocrWorker = null;
 let ocrInitializing = false;
-let cofreAberto = false; // TRAVA DE SEGURANÇA CORRIGIDA
+let cofreAberto = false; // TRAVA DE SEGURANÇA
 
 // ════════════════════════════════════════
 // FIREBASE, SINCRONIZAÇÃO E LOGIN NO APP
@@ -744,7 +745,6 @@ function setDb(ok){
 window.syncCentral = async function() {
   if(!fbOk||!db||!fns) return;
   try {
-    // 1. Puxa OS da nuvem
     const snap=await fns.getDocs(fns.query(fns.collection(db,'ordens'),fns.orderBy('criadoEm','desc'),fns.limit(1000)));
     const fbOrdens=[]; 
     snap.forEach(d=>{
@@ -753,10 +753,7 @@ window.syncCentral = async function() {
         fbOrdens.push({id:d.id, ...dt});
     });
     
-    // 2. Pega celular
     const localOrdens=JSON.parse(localStorage.getItem('ordens_local')||'[]');
-    
-    // 3. Junta os dois preservando datas corretas
     const mapOrdens = new Map();
     localOrdens.forEach(o => {
         if(o.criadoEm && o.criadoEm.seconds) o.criadoEm = new Date(o.criadoEm.seconds * 1000).toISOString();
@@ -764,12 +761,10 @@ window.syncCentral = async function() {
     });
     fbOrdens.forEach(o => {
         const loc = mapOrdens.get(o.numero);
-        // CURA DO BUG: Se a nuvem não tiver a data exata (ou for nula), pegue a data salva no celular
         if (!o.criadoEm || (o.criadoEm && o.criadoEm.includes('1970'))) {
            if (loc && loc.criadoEm) o.criadoEm = loc.criadoEm;
            else o.criadoEm = new Date().toISOString(); 
         }
-        // Se a OS no celular já foi concluída, mas a nuvem ainda diz "aguardando", a conclusão local manda!
         if (loc && (loc.status === 'concluido' || loc.status === 'cancelado') && o.status === 'aguardando') {
             o.status = loc.status;
             if(fbOk&&db&&fns&&o.id) fns.updateDoc(fns.doc(db,'ordens',o.id),{status:loc.status}).catch(()=>{});
@@ -779,7 +774,6 @@ window.syncCentral = async function() {
     
     localStorage.setItem('ordens_local',JSON.stringify(Array.from(mapOrdens.values()).sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm))));
     
-    // Mesma coisa para Gastos
     const gSnap=await fns.getDocs(fns.query(fns.collection(db,'gastos'),fns.orderBy('criadoEm','desc'),fns.limit(1000)));
     const fbGastos=[]; 
     gSnap.forEach(d=>{
@@ -852,7 +846,6 @@ function setTab(t){
   if(t==='config')    {loadCfg();renderCfgTipos();renderCfgBorraServs();renderCfgLavLava();renderCfgLavBorra();}
   
   if(t==='financeiro'){
-    // SE O COFRE ESTIVER DESTRANCADO, ELE ENTRA. SE NÃO, FICA NA TELA DE PIN.
     if(cofreAberto){
       document.getElementById('fin-locked').style.display='none';
       document.getElementById('fin-content').style.display='block';
@@ -879,13 +872,13 @@ function setFinSubTab(tab){
 }
 
 function trancarGerencia() {
-  cofreAberto = false; // Trava o cofre no código
-  setTab('nova'); // Joga o usuário pra fora da tela
+  cofreAberto = false; 
+  setTab('nova'); 
   toast('Cofre da gerência trancado 🔒','ok');
 }
 
 // ════════════════════════════════════════
-// CÂMERA + OCR (MIRA FENDA E AUTO-CORRETOR)
+// CÂMERA + OCR
 // ════════════════════════════════════════
 async function toggleCam(ctx){
   if(camOn&&camContext===ctx){stopCam();return;}
@@ -1127,7 +1120,6 @@ window.remLavBorra=function(t){
   saveLavadores();renderLavadores();renderCfgLavBorra();
 }
 
-
 // ════════════════════════════════════════
 // TIPOS LAVAGEM E SERVIÇOS
 // ════════════════════════════════════════
@@ -1316,7 +1308,7 @@ async function abrirOS(tipo){
   const os={
     placa, lavador, tipo:servicoLabel, valor, obs,
     status:'aguardando', setor:tipo,
-    numero:gerarNum(), criadoEm:new Date().toISOString(), // Cria a data segura no formato ISO
+    numero:gerarNum(), criadoEm:new Date().toISOString(),
     nomeEstab:cfg.nome||'Nova Onda', tel:cfg.tel||'', end:cfg.end||'',
   };
 
@@ -1534,7 +1526,7 @@ function getOrdens(periodo,all){
   const setor=relTab;
   const now=new Date();
   return data.filter(o=>{
-    if(o.status !== 'concluido') return false; // SÓ CONTA SE TIVER FINALIZADO!
+    if(o.status !== 'concluido') return false; 
     if((o.setor||'lava')!==setor)return false;
     
     const dt=new Date(o.criadoEm?.toDate?o.criadoEm.toDate():o.criadoEm);
@@ -1668,7 +1660,7 @@ window.lancarGasto = function(){
   renderFinanceiro();
 }
 window.renderFinanceiro = function(){
-  const all=JSON.parse(localStorage.getItem('ordens_local')||'[]').filter(o=>o.status === 'concluido'); // SÓ CONTA DINHEIRO DE OS FINALIZADA
+  const all=JSON.parse(localStorage.getItem('ordens_local')||'[]').filter(o=>o.status === 'concluido'); 
   const gastos=JSON.parse(localStorage.getItem('gastos')||'[]');
   const ordFilt=filtrarPorPeriodo(finPeriodo,all);
   const gasFilt=filtrarPorPeriodo(finPeriodo,gastos);
@@ -1795,7 +1787,7 @@ window.confirmarSenha = async function(){
   fecharSenha();
   
   if(senhaCtx==='fin'){
-    cofreAberto = true; // ATIVA A TRAVA DO COFRE ABERTO
+    cofreAberto = true; 
     document.getElementById('fin-locked').style.display='none';
     document.getElementById('fin-content').style.display='block';
     toast('Sincronizando nuvem...','');
@@ -1804,11 +1796,31 @@ window.confirmarSenha = async function(){
     carregarRelatorio(); 
   }
   if(senhaCtx==='reset'){
-    if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
+    if(confirm('Tem certeza que deseja APAGAR TUDO na nuvem e no celular? Ação IRREVERSÍVEL.')) {
+      toast('Apagando nuvem... aguarde.','');
+      
+      // APAGA TUDO NO FIREBASE
+      if(fbOk && db && fns && fns.deleteDoc) {
+         try {
+            const snapOrdens = await fns.getDocs(fns.collection(db, 'ordens'));
+            snapOrdens.forEach(d => fns.deleteDoc(fns.doc(db, 'ordens', d.id)));
+            
+            const snapGastos = await fns.getDocs(fns.collection(db, 'gastos'));
+            snapGastos.forEach(d => fns.deleteDoc(fns.doc(db, 'gastos', d.id)));
+         } catch(err) { console.error(err); }
+      }
+
+      // APAGA TUDO NO CELULAR
       localStorage.removeItem('ordens_local');
       localStorage.removeItem('gastos');
       localStorage.removeItem('os_seq');
-      filaCache=[]; renderFila(); toast('Sistema zerado com sucesso!','ok');
+      filaCache=[]; 
+      renderFila(); 
+      if(document.getElementById('fin-content').style.display==='block'){
+         renderFinanceiro();
+         carregarRelatorio();
+      }
+      toast('Sistema zerado completamente!','ok');
     }
   }
 }
