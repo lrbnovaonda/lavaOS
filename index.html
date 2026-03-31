@@ -163,12 +163,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .btn-sm{padding:8px 13px;font-size:12px;width:auto}
 .btn-xs{padding:6px 10px;font-size:11px;width:auto}
 
-/* Camera - MUDANÇA NA MIRA DA IA */
+/* Camera - MIRA FENDA FINA */
 #cam-wrap,#cam-wrap-b{display:none;margin-bottom:14px;border-radius:var(--r);overflow:hidden;
   border:1px solid var(--border);position:relative;background:#000;aspect-ratio:16/9}
 .cam-video{width:100%;height:100%;object-fit:cover;display:block}
 .cam-ov{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
-/* A MIRA AGORA É UMA FENDA FINA APENAS PARA AS LETRAS */
 .sf{width:80%;height:25%;border:2.5px solid var(--cyan);border-radius:8px;
   box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 28px rgba(41,182,246,.25);position:relative}
 .sf.amber-sf{border-color:var(--amber);box-shadow:0 0 0 9999px rgba(0,0,0,.6),0 0 28px rgba(245,158,11,.25)}
@@ -336,7 +335,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
 .cfg-row:last-child{border-bottom:none}
 
-/* AJUSTE FINO DE IMPRESSÃO (NÃO FORCE O MAX, USE 100%) */
+/* IMPRESSÃO 100% PARA SE ADAPTAR A QUALQUER ROLO */
 @media print{
   @page{margin:0}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -740,17 +739,37 @@ function setDb(ok){
   const l2=document.getElementById('db-lbl2');if(l2)l2.textContent=ok?'✓ Conectado':'Offline — Verifique a internet';
 }
 
-// SINCRONIZADOR MESTRE: Baixa toda a nuvem para o aparelho para relatórios precisos
+// SINCRONIZADOR MESTRE: Une dados da nuvem com os do aparelho para NUNCA perder nada
 window.syncCentral = async function() {
   if(!fbOk||!db||!fns) return;
   try {
+    // 1. Puxa da nuvem
     const snap=await fns.getDocs(fns.query(fns.collection(db,'ordens'),fns.orderBy('criadoEm','desc'),fns.limit(1000)));
-    const fb=[]; snap.forEach(d=>fb.push({id:d.id,...d.data()}));
-    localStorage.setItem('ordens_local',JSON.stringify(fb));
+    const fbOrdens=[]; snap.forEach(d=>fbOrdens.push({id:d.id,...d.data()}));
     
+    // 2. Pega os que já estão no celular (mesmo os offline)
+    const localOrdens=JSON.parse(localStorage.getItem('ordens_local')||'[]');
+    
+    // 3. Junta os dois (sem duplicar)
+    const mapOrdens = new Map();
+    fbOrdens.forEach(o => mapOrdens.set(o.numero, o));
+    localOrdens.forEach(o => {
+       if(!mapOrdens.has(o.numero)) mapOrdens.set(o.numero, o);
+    });
+    localStorage.setItem('ordens_local',JSON.stringify(Array.from(mapOrdens.values()).sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm))));
+    
+    // Faz a mesma junção segura com os Gastos
     const gSnap=await fns.getDocs(fns.query(fns.collection(db,'gastos'),fns.orderBy('criadoEm','desc'),fns.limit(1000)));
-    const gFb=[]; gSnap.forEach(d=>gFb.push({id:d.id,...d.data()}));
-    localStorage.setItem('gastos',JSON.stringify(gFb));
+    const fbGastos=[]; gSnap.forEach(d=>fbGastos.push({id:d.id,...d.data()}));
+    
+    const localGastos=JSON.parse(localStorage.getItem('gastos')||'[]');
+    const mapGastos = new Map();
+    fbGastos.forEach(g => mapGastos.set(g.criadoEm, g));
+    localGastos.forEach(g => {
+       if(!mapGastos.has(g.criadoEm)) mapGastos.set(g.criadoEm, g);
+    });
+    localStorage.setItem('gastos',JSON.stringify(Array.from(mapGastos.values()).sort((a,b)=>new Date(b.criadoEm)-new Date(a.criadoEm))));
+
   } catch(e) { console.warn("Erro ao sincronizar nuvem:", e); }
 };
 
@@ -805,7 +824,7 @@ function setTab(t){
     if(window.__authUser){
       document.getElementById('fin-locked').style.display='none';
       document.getElementById('fin-content').style.display='block';
-      toast('Sincronizando dados da nuvem...','');
+      toast('Sincronizando dados...','');
       window.syncCentral().then(()=>{
          renderFinanceiro();
          carregarRelatorio();
@@ -846,6 +865,7 @@ async function toggleCam(ctx){
   document.getElementById(wrapId).style.display='block';
   document.getElementById(btnId).textContent='■ Fechar câmera';
 
+  // Inicia a IA apenas uma vez e deixa na memória
   if(!ocrWorker && !ocrInitializing) {
      ocrInitializing = true;
      document.getElementById(stId).textContent = '⏳ Iniciando inteligência...';
@@ -884,6 +904,7 @@ function iniciarOCR(ctx){
   
   async function loop(){
     if(!camOn||camContext!==ctx)return;
+    // Se a IA não carregou ainda, espera
     if(ocrBusy||video.readyState<2||!ocrWorker){ocrTimer=setTimeout(loop,400);return;}
     
     ocrBusy=true; st.textContent='🔍 Lendo placa...';
