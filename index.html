@@ -941,46 +941,43 @@ function mostrarTicket(os){
   const hora=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const data=dt.toLocaleDateString('pt-BR');
   const isBorra=os.setor==='borra';
-  const tEnd=os.end?('<div style="font-size:7pt">'+os.end+'</div>'):'';
-  const tTel=os.tel?('<div style="font-size:7pt">Tel: '+os.tel+'</div>'):'';
-  const tObs=os.obs?('<div style="font-size:7pt;margin-top:1mm">Obs: '+os.obs+'</div>'):'';
-  const tBg=isBorra?';background:#fffbeb':'';
-  const tNome=isBorra?'NOVA ONDA BORRACHARIA':((os.nomeEstab||'Nova Onda Lava Rapido')+'').toUpperCase();
-  const tSub='LAVA RAPIDO &amp; BORRACHARIA';
-  const tOsLabel=isBorra?'OS BORRACHARIA':'ORDEM DE SERVICO';
-  const tResLabel=isBorra?'Borracheiro':'Lavador';
-  const tValor='R$ '+Number(os.valor).toFixed(2).replace('.',',');
-  document.getElementById('ticket-wrap').innerHTML=
-    '<div style="width:100%;max-width:58mm;box-sizing:border-box;padding:2mm;font-family:\'Courier New\',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">'+
-    '<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:3mm;margin-bottom:3mm">'+
-    '<div style="font-size:11pt;font-weight:900;letter-spacing:1px">'+tNome+'</div>'+
-    '<div style="font-size:7pt">'+tSub+'</div>'+tEnd+tTel+
-    '</div>'+
-    '<div style="text-align:center;margin-bottom:3mm">'+
-    '<div style="font-size:7pt;letter-spacing:1px">'+tOsLabel+'</div>'+
-    '<div style="font-size:10pt;font-weight:900">#'+os.numero+'</div>'+
-    '<div style="font-size:7pt">'+data+' '+hora+'</div>'+
-    '</div>'+
-    '<div style="border:2px solid #000;padding:2mm;text-align:center;margin-bottom:3mm'+tBg+'">'+
-    '<div style="font-size:7pt;letter-spacing:1px;margin-bottom:1mm">PLACA</div>'+
-    '<div style="font-size:22pt;font-weight:900;letter-spacing:4px;line-height:1">'+os.placa+'</div>'+
-    '</div>'+
-    '<div style="border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm">'+
-    '<div style="display:flex;justify-content:space-between"><span>Servico</span><span style="font-weight:700;text-align:right;max-width:55%;font-size:8pt">'+os.tipo+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>'+tResLabel+'</span><span style="font-weight:700">'+(os.lavador||'—')+'</span></div>'+
-    tObs+
-    '</div>'+
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm">'+
-    '<span style="font-size:10pt;font-weight:900">TOTAL</span>'+
-    '<span style="font-size:16pt;font-weight:900">'+tValor+'</span>'+
-    '</div>'+
-    '<div style="border:1px solid #000;text-align:center;padding:1mm;margin-bottom:3mm">'+
-    '<div style="font-size:7pt">STATUS</div>'+
-    '<div style="font-size:10pt;font-weight:900">*** AGUARDANDO ***</div>'+
-    '</div>'+
-    '<div style="text-align:center;font-size:7pt;border-top:1px dashed #000;padding-top:2mm">'+
-    'Obrigado pela preferencia!<br/>Nova Onda - LavaOS'+
-    '</div></div>';
+  document.getElementById('ticket-wrap').innerHTML=`
+<div style="width:100%;max-width:58mm;box-sizing:border-box;padding:2mm;font-family:'Courier New',monospace;font-size:9pt;line-height:1.4;color:#000;margin:0 auto">
+  <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:3mm;margin-bottom:3mm">
+    <div style="font-size:9.5pt;font-weight:900;letter-spacing:0">${(os.nomeEstab||'NOVA ONDA').toUpperCase()}</div>
+    
+    <div style="font-size:7.5pt;font-weight:bold">${isBorra?'BORRACHARIA':'LAVA RÁPIDO &amp; BORRACHARIA'}</div>
+    ${os.end?`<div style="font-size:7.5pt;font-weight:bold">${os.end}</div>`:''}
+    ${os.tel?`<div style="font-size:7.5pt;font-weight:bold">Tel: ${os.tel}</div>`:''}
+  </div>
+  
+  <div style="text-align:center;margin-bottom:3mm">
+    <div style="font-size:7pt;letter-spacing:1px;font-weight:bold">${isBorra?'OS BORRACHARIA':'ORDEM DE SERVICO'}</div>
+    <div style="font-size:10pt;font-weight:900">#${os.numero}</div>
+    <div style="font-size:7pt;font-weight:bold">${data} ${hora}</div>
+  </div>
+  
+  <div style="border:2px solid #000;padding:2mm;text-align:center;margin-bottom:3mm${isBorra?';background:#fffbeb':''}">
+    <div style="font-size:7pt;letter-spacing:1px;margin-bottom:1mm;font-weight:bold">PLACA</div>
+    <div style="font-size:22pt;font-weight:900;letter-spacing:4px;line-height:1">${os.placa}</div>
+  </div>
+  
+  <div style="border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm">
+    <div style="display:flex;justify-content:space-between"><span>Servico</span><span style="font-weight:700;text-align:right;max-width:55%;font-size:8pt">${os.tipo}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>${isBorra?'Borracheiro':'Lavador'}</span><span style="font-weight:700">${os.lavador||'—'}</span></div>
+    ${os.obs?`<div style="font-size:7pt;margin-top:1mm;font-weight:bold">Obs: ${os.obs}</div>`:''}
+  </div>
+  
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2mm">
+    <span style="font-size:10pt;font-weight:900">TOTAL</span>
+    <span style="font-size:16pt;font-weight:900">R$ ${Number(os.valor).toFixed(2).replace('.',',')}</span>
+  </div>
+  
+  <div style="border:1px solid #000;text-align:center;padding:1mm">
+    <div style="font-size:7pt;font-weight:bold">STATUS</div>
+    <div style="font-size:10pt;font-weight:900">*** AGUARDANDO ***</div>
+  </div>
+  </div>`;
   document.getElementById('ticket-modal').classList.add('open');
 }
 function fecharTicket(){document.getElementById('ticket-modal').classList.remove('open');}
