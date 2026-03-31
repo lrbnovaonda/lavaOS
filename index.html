@@ -368,7 +368,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div class="card" style="width:100%;max-width:340px;padding:24px">
     <div class="ig">
       <label>E-mail oficial</label>
-      <input id="login-email-app" type="email" placeholder="lrbnovaonda@gmail.com"/>
+      <input id="login-email-app" type="email" value="lrbnovaonda@gmail.com" readonly
+      style="background:rgba(0,0,0,0.2); color:var(--accent); font-weight:bold; text-align:center; border:1px dashed var(--border); cursor:not-allowed"/>
     </div>
     <div class="ig">
       <label>Senha</label>
@@ -629,6 +630,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <button class="btn btn-primary" onclick="alterarSenhaAdmin()">💾 Alterar PIN</button>
   </div>
 
+  <div class="card"><div class="card-title">Equipe: Lava Rápido</div><div id="cfg-lav-lava"></div></div>
+  <div class="card" style="border-color:rgba(245,158,11,.25)"><div class="card-title amber">Equipe: Borracharia</div><div id="cfg-lav-borra"></div></div>
+
+  <div class="card"><div class="card-title">Tipos de Lavagem</div><div id="cfg-tipos"></div></div>
+  <div class="card" style="border-color:rgba(245,158,11,.25)"><div class="card-title amber">Serviços de Borracharia</div><div id="cfg-borra-servs"></div></div>
+
   <div class="card">
     <div class="card-title">Tema do App</div>
     <div class="theme-opts">
@@ -637,9 +644,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
       <div class="theme-btn" id="theme-light" onclick="setTheme('light',this)">☀️ Claro</div>
     </div>
   </div>
-  
-  <div class="card"><div class="card-title">Tipos de Lavagem</div><div id="cfg-tipos"></div></div>
-  <div class="card" style="border-color:rgba(245,158,11,.3)"><div class="card-title amber">Serviços de Borracharia</div><div id="cfg-borra-servs"></div></div>
   
   <div class="card" style="border-color:rgba(255,76,106,.3)">
     <div class="card-title" style="color:#ff4c6a">Firebase / Acesso</div>
@@ -677,14 +681,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 <div id="senha-modal">
   <div class="senha-box">
     <div style="font-size:40px;margin-bottom:10px">🔐</div>
-    <h3>Cofre da Gerência</h3>
+    <h3 id="senha-titulo">Cofre da Gerência</h3>
     <p id="senha-desc" style="margin-bottom:14px">Digite o PIN para destravar</p>
     <div class="ig">
       <input id="senha-inp" type="password" placeholder="••••••••"/>
     </div>
     <div style="display:flex;gap:8px; margin-top:16px">
       <button class="btn btn-ghost" onclick="fecharSenha()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarSenha()">Destravar</button>
+      <button class="btn btn-primary" onclick="confirmarSenha()">Confirmar</button>
     </div>
   </div>
 </div>
@@ -697,19 +701,20 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 // ════════════════════════════════════════
 let senhaAdmin = localStorage.getItem('senha_admin') || 'masternovaonda';
 
-const LAV_LAVA    = ['João Pedro','Litio','Samuel','Cleber','Glauber','Cleberson','Gustavo','Avulso'];
-const LAV_BORRA   = ['Andrei','João Pedro','Avulso'];
 const VALS_RAP    = [15,20,25,30,40,50,60,80,100,120,150,200];
 const CAT_LABELS  = {agua:'Água',energia:'Energia',produto:'Produto',salario:'Salário',outros:'Outros'};
 const CAT_COLORS  = {agua:'rgba(41,182,246,.7)',energia:'rgba(255,184,0,.7)',produto:'rgba(102,187,106,.7)',salario:'rgba(171,71,188,.7)',outros:'rgba(255,112,67,.7)'};
 
 // ════════════════════════════════════════
-// STATE
+// STATE & DADOS DINÂMICOS
 // ════════════════════════════════════════
 let db,fns,fbOk=false;
+let lavLava=JSON.parse(localStorage.getItem('lavLava')||'["João Pedro","Litio","Samuel","Cleber","Glauber","Cleberson","Gustavo"]');
+let lavBorra=JSON.parse(localStorage.getItem('lavBorra')||'["Andrei","João Pedro"]');
 let tipos=JSON.parse(localStorage.getItem('tipos')||'["Simples","Completa","Polimento","Higienização","Enceramento","Externo"]');
 let borraServs=JSON.parse(localStorage.getItem('borraServs')||'["Remendo a macarrão","Remendo a quente","Remendo a frio","Troca de pneus","Troca câmara de ar","Troca de válvula","Vulcanização","Rodízio de pneu","Outro"]');
 let cfg=JSON.parse(localStorage.getItem('cfg')||'{"nome":"Lava Rápido Nova Onda","end":"Av Deli Lacerda N-888 Centro - Quaraçu","tel":"(77) 99937-7205"}');
+
 let tipoSel=null, lavSelLava=null, lavSelBorra=null, borraServsSel=[];
 let camStream=null,camOn=false,ocrTimer=null,ocrBusy=false,camContext='lava';
 let filaCache=[],filaTab='lava';
@@ -735,7 +740,7 @@ async function fazerLoginApp() {
   const email = document.getElementById('login-email-app').value.trim();
   const pwd = document.getElementById('login-senha-app').value;
   
-  if(!email || !pwd){ toast('Preencha e-mail e senha','err'); return; }
+  if(!email || !pwd){ toast('Preencha a senha','err'); return; }
   if(!window.__fbOk || !window.__auth || !window.__fns) { toast('Conecte à internet primeiro!','err'); return; }
 
   const btn = document.getElementById('btn-login-app');
@@ -746,7 +751,7 @@ async function fazerLoginApp() {
     toast('Bem-vindo ao sistema! ✅','ok');
   } catch(e) {
     console.error(e);
-    toast('E-mail ou senha incorretos!','err');
+    toast('Senha incorreta!','err');
   } finally {
     btn.disabled = false; btn.textContent = 'Entrar no Sistema';
   }
@@ -763,7 +768,6 @@ function sairDoApp() {
 // TABS E SUB-TABS
 // ════════════════════════════════════════
 function setTab(t){
-  // Tranca financeiro ao sair para outra aba
   if(t!=='financeiro'){
     document.getElementById('fin-locked').style.display='block';
     document.getElementById('fin-content').style.display='none';
@@ -777,7 +781,7 @@ function setTab(t){
   btns[idx[t]].classList.add('active');
   
   if(t==='fila')      carregarFila();
-  if(t==='config')    {loadCfg();renderCfgTipos();renderCfgBorraServs();}
+  if(t==='config')    {loadCfg();renderCfgTipos();renderCfgBorraServs();renderCfgLavLava();renderCfgLavBorra();}
 }
 
 function setFinSubTab(tab){
@@ -866,11 +870,16 @@ function iniciarOCR(ctx){
 }
 
 // ════════════════════════════════════════
-// LAVADORES
+// LAVADORES E EQUIPE
 // ════════════════════════════════════════
+function saveLavadores(){
+  localStorage.setItem('lavLava',JSON.stringify(lavLava));
+  localStorage.setItem('lavBorra',JSON.stringify(lavBorra));
+}
+
 function renderLavadores(){
-  renderLavGrid('lav-grid-lava',LAV_LAVA,'lava');
-  renderLavGrid('lav-grid-borra',LAV_BORRA,'borra');
+  renderLavGrid('lav-grid-lava', [...lavLava, 'Avulso'], 'lava');
+  renderLavGrid('lav-grid-borra', [...lavBorra, 'Avulso'], 'borra');
 }
 function renderLavGrid(gridId,lista,tipo){
   const g=document.getElementById(gridId); if(!g)return;
@@ -888,6 +897,99 @@ function renderLavGrid(gridId,lista,tipo){
     g.appendChild(el);
   });
 }
+
+function renderCfgLavLava(){
+  const c=document.getElementById('cfg-lav-lava');if(!c)return;c.innerHTML='';
+  const addRow=document.createElement('div');addRow.style.cssText='display:flex;gap:8px;margin-bottom:14px';
+  addRow.innerHTML='<input id="cfg-novo-lav-lava" type="text" placeholder="Novo lavador..." style="flex:1"/><button class="btn btn-primary btn-sm" onclick="addLavLavaFromCfg()">＋ Adicionar</button>';
+  c.appendChild(addRow);
+  lavLava.forEach((t,i)=>{
+    const tid='lavl_'+i;
+    const tesc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const r=document.createElement('div');r.className='cfg-row';r.id='cfg-row-'+tid;
+    r.innerHTML=`<span id="lbl-${tid}" style="font-size:14px;flex:1">${t}</span>
+      <input id="inp-${tid}" type="text" value="${t}" style="display:none;flex:1;padding:6px 10px;font-size:14px;margin-right:8px"/>
+      <div style="display:flex;gap:5px">
+        <button id="bedit-${tid}" class="btn btn-ghost btn-xs" onclick="editarLavLava('${tesc}',${i})">✏️</button>
+        <button id="bsave-${tid}" class="btn btn-success btn-xs" style="display:none" onclick="salvarLavLava('${tesc}',${i})">✓</button>
+        <button class="btn btn-danger btn-xs" onclick="remLavLava('${tesc}')">🗑</button>
+      </div>`;
+    c.appendChild(r);
+  });
+}
+window.addLavLavaFromCfg=function(){
+  const inp=document.getElementById('cfg-novo-lav-lava'); const v=inp.value.trim();
+  if(!v||lavLava.includes(v)){inp.value='';return;}
+  lavLava.push(v);saveLavadores();renderLavadores();renderCfgLavLava();inp.value=''; toast('Lavador adicionado!','ok');
+}
+window.editarLavLava=function(t,i){
+  const tid='lavl_'+i;
+  document.getElementById('lbl-'+tid).style.display='none';
+  document.getElementById('inp-'+tid).style.display='flex';
+  document.getElementById('bedit-'+tid).style.display='none';
+  document.getElementById('bsave-'+tid).style.display='inline-flex';
+  document.getElementById('inp-'+tid).focus();
+}
+window.salvarLavLava=function(t,i){
+  const tid='lavl_'+i;
+  const novoNome=document.getElementById('inp-'+tid)?.value.trim();
+  if(!novoNome){toast('Nome vazio!','err');return;}
+  if(lavLava.includes(novoNome)&&novoNome!==t){toast('Já existe!','err');return;}
+  if(lavSelLava===t)lavSelLava=novoNome;
+  lavLava[i]=novoNome;
+  saveLavadores();renderLavadores();renderCfgLavLava(); toast('Atualizado!','ok');
+}
+window.remLavLava=function(t){
+  lavLava=lavLava.filter(x=>x!==t); if(lavSelLava===t)lavSelLava=null;
+  saveLavadores();renderLavadores();renderCfgLavLava();
+}
+
+function renderCfgLavBorra(){
+  const c=document.getElementById('cfg-lav-borra');if(!c)return;c.innerHTML='';
+  const addRow=document.createElement('div');addRow.style.cssText='display:flex;gap:8px;margin-bottom:14px';
+  addRow.innerHTML='<input id="cfg-novo-lav-borra" type="text" placeholder="Novo borracheiro..." style="flex:1"/><button class="btn btn-amber btn-sm" onclick="addLavBorraFromCfg()">＋ Adicionar</button>';
+  c.appendChild(addRow);
+  lavBorra.forEach((t,i)=>{
+    const tid='lavb_'+i;
+    const tesc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const r=document.createElement('div');r.className='cfg-row';r.id='cfg-row-'+tid;
+    r.innerHTML=`<span id="lbl-${tid}" style="font-size:14px;flex:1">${t}</span>
+      <input id="inp-${tid}" type="text" value="${t}" style="display:none;flex:1;padding:6px 10px;font-size:14px;margin-right:8px"/>
+      <div style="display:flex;gap:5px">
+        <button id="bedit-${tid}" class="btn btn-ghost btn-xs" onclick="editarLavBorra('${tesc}',${i})">✏️</button>
+        <button id="bsave-${tid}" class="btn btn-success btn-xs" style="display:none" onclick="salvarLavBorra('${tesc}',${i})">✓</button>
+        <button class="btn btn-danger btn-xs" onclick="remLavBorra('${tesc}')">🗑</button>
+      </div>`;
+    c.appendChild(r);
+  });
+}
+window.addLavBorraFromCfg=function(){
+  const inp=document.getElementById('cfg-novo-lav-borra'); const v=inp.value.trim();
+  if(!v||lavBorra.includes(v)){inp.value='';return;}
+  lavBorra.push(v);saveLavadores();renderLavadores();renderCfgLavBorra();inp.value=''; toast('Borracheiro adicionado!','ok');
+}
+window.editarLavBorra=function(t,i){
+  const tid='lavb_'+i;
+  document.getElementById('lbl-'+tid).style.display='none';
+  document.getElementById('inp-'+tid).style.display='flex';
+  document.getElementById('bedit-'+tid).style.display='none';
+  document.getElementById('bsave-'+tid).style.display='inline-flex';
+  document.getElementById('inp-'+tid).focus();
+}
+window.salvarLavBorra=function(t,i){
+  const tid='lavb_'+i;
+  const novoNome=document.getElementById('inp-'+tid)?.value.trim();
+  if(!novoNome){toast('Nome vazio!','err');return;}
+  if(lavBorra.includes(novoNome)&&novoNome!==t){toast('Já existe!','err');return;}
+  if(lavSelBorra===t)lavSelBorra=novoNome;
+  lavBorra[i]=novoNome;
+  saveLavadores();renderLavadores();renderCfgLavBorra(); toast('Atualizado!','ok');
+}
+window.remLavBorra=function(t){
+  lavBorra=lavBorra.filter(x=>x!==t); if(lavSelBorra===t)lavSelBorra=null;
+  saveLavadores();renderLavadores();renderCfgLavBorra();
+}
+
 
 // ════════════════════════════════════════
 // TIPOS LAVAGEM
@@ -907,7 +1009,7 @@ function addTipo(){
   if(!v||tipos.includes(v)){inp.value='';return;}
   tipos.push(v); saveTipos(); renderTipos(); renderCfgTipos(); inp.value='';
 }
-function remTipo(t){tipos=tipos.filter(x=>x!==t);if(tipoSel===t)tipoSel=null;saveTipos();renderTipos();renderCfgTipos();}
+window.remTipo=function(t){tipos=tipos.filter(x=>x!==t);if(tipoSel===t)tipoSel=null;saveTipos();renderTipos();renderCfgTipos();}
 function saveTipos(){localStorage.setItem('tipos',JSON.stringify(tipos));}
 function renderCfgTipos(){
   const c=document.getElementById('cfg-tipos');if(!c)return;c.innerHTML='';
@@ -928,14 +1030,14 @@ function renderCfgTipos(){
     c.appendChild(r);
   });
 }
-function addTipoFromCfg(){
+window.addTipoFromCfg=function(){
   const inp=document.getElementById('cfg-novo-tipo');
   const v=inp.value.trim();
   if(!v||tipos.includes(v)){inp.value='';return;}
   tipos.push(v);saveTipos();renderTipos();renderCfgTipos();inp.value='';
   toast('Tipo adicionado!','ok');
 }
-function editarTipo(t,i){
+window.editarTipo=function(t,i){
   const tid='tipo_'+i;
   document.getElementById('lbl-'+tid).style.display='none';
   document.getElementById('inp-'+tid).style.display='flex';
@@ -943,7 +1045,7 @@ function editarTipo(t,i){
   document.getElementById('bsave-'+tid).style.display='inline-flex';
   document.getElementById('inp-'+tid).focus();
 }
-function salvarTipo(t,i){
+window.salvarTipo=function(t,i){
   const tid='tipo_'+i;
   const novoNome=document.getElementById('inp-'+tid)?.value.trim();
   if(!novoNome){toast('Nome vazio!','err');return;}
@@ -973,7 +1075,7 @@ function renderBorraServs(){
   });
 }
 function saveBorraServs(){localStorage.setItem('borraServs',JSON.stringify(borraServs));}
-function remBorraServ(t){
+window.remBorraServ=function(t){
   borraServs=borraServs.filter(x=>x!==t);
   borraServsSel=borraServsSel.filter(x=>x!==t);
   saveBorraServs();renderBorraServs();renderCfgBorraServs();
@@ -997,14 +1099,14 @@ function renderCfgBorraServs(){
     c.appendChild(r);
   });
 }
-function addBorraServFromCfg(){
+window.addBorraServFromCfg=function(){
   const inp=document.getElementById('cfg-novo-borra');
   const v=inp.value.trim();
   if(!v||borraServs.includes(v)){inp.value='';return;}
   borraServs.push(v);saveBorraServs();renderBorraServs();renderCfgBorraServs();inp.value='';
   toast('Serviço adicionado!','ok');
 }
-function editarBorraServ(t,i){
+window.editarBorraServ=function(t,i){
   const tid='borra_'+i;
   document.getElementById('lbl-'+tid).style.display='none';
   document.getElementById('inp-'+tid).style.display='flex';
@@ -1012,7 +1114,7 @@ function editarBorraServ(t,i){
   document.getElementById('bsave-'+tid).style.display='inline-flex';
   document.getElementById('inp-'+tid).focus();
 }
-function salvarBorraServ(t,i){
+window.salvarBorraServ=function(t,i){
   const tid='borra_'+i;
   const novoNome=document.getElementById('inp-'+tid)?.value.trim();
   if(!novoNome){toast('Nome vazio!','err');return;}
@@ -1103,6 +1205,7 @@ async function abrirOS(tipo){
   btn.disabled=false;
   btn.textContent=tipo==='lava'?'✅ Abrir OS e Gerar Ticket':'🔧 Abrir OS Borracharia';
 }
+window.abrirOS = abrirOS;
 
 function gerarNum(){
   const d=new Date();
@@ -1150,8 +1253,8 @@ function mostrarTicket(os){
 </div>`;
   document.getElementById('ticket-modal').classList.add('open');
 }
-function fecharTicket(){document.getElementById('ticket-modal').classList.remove('open');}
-function mostrarTicketById(numero){
+window.fecharTicket = function(){document.getElementById('ticket-modal').classList.remove('open');}
+window.mostrarTicketById = function(numero){
   const os=filaCache.find(o=>o.numero===numero);
   if(os)mostrarTicket(os);
 }
@@ -1159,14 +1262,14 @@ function mostrarTicketById(numero){
 // ════════════════════════════════════════
 // FILA
 // ════════════════════════════════════════
-function setFilaTab(tab){
+window.setFilaTab = function(tab){
   filaTab=tab;
   document.getElementById('fila-tab-lava').className='sub-tab'+(tab==='lava'?' active-lava':'');
   document.getElementById('fila-tab-borra').className='sub-tab'+(tab==='borra'?' active-borra':'');
   renderFila();
 }
 
-async function carregarFila(){
+window.carregarFila = async function(){
   const hoje=new Date().toDateString();
   const local=JSON.parse(localStorage.getItem('ordens_local')||'[]')
               .filter(o=>new Date(o.criadoEm).toDateString()===hoje);
@@ -1225,7 +1328,7 @@ function renderFila(){
   });
 }
 
-function finalizarOS(numero,event){
+window.finalizarOS = function(numero,event){
   event.stopPropagation();
   const idx=filaCache.findIndex(o=>o.numero===numero);
   if(idx<0)return;
@@ -1239,13 +1342,13 @@ function finalizarOS(numero,event){
   renderFila(); toast('OS concluída! ✅','ok');
 }
 
-function pedirCancelar(numero,event){
+window.pedirCancelar = function(numero,event){
   event.stopPropagation();
   cancelPendingNum=numero;
   document.getElementById('confirm-modal').classList.add('open');
 }
-function fecharConfirm(){document.getElementById('confirm-modal').classList.remove('open');cancelPendingNum=null;}
-function confirmarCancelar(){
+window.fecharConfirm = function(){document.getElementById('confirm-modal').classList.remove('open');cancelPendingNum=null;}
+window.confirmarCancelar = function(){
   fecharConfirm();
   if(!cancelPendingNum)return;
   const numero=cancelPendingNum; cancelPendingNum=null;
@@ -1265,7 +1368,7 @@ function confirmarCancelar(){
 // ════════════════════════════════════════
 // RELATÓRIOS (DENTRO DA GERÊNCIA)
 // ════════════════════════════════════════
-function setRelTab(tab){
+window.setRelTab = function(tab){
   relTab=tab;
   document.getElementById('rel-tab-lava').className='rel-tab'+(tab==='lava'?' active-lava':'');
   document.getElementById('rel-tab-borra').className='rel-tab'+(tab==='borra'?' active-borra':'');
@@ -1273,20 +1376,20 @@ function setRelTab(tab){
   document.getElementById('rel-rank-title').textContent=tab==='lava'?'🏆 Ranking Lavadores':'🏆 Ranking Borracheiros';
   document.getElementById('rel-hist-title').textContent=tab==='lava'?'Histórico — Lava Rápido':'Histórico — Borracharia';
   document.getElementById('rel-servicos-card').style.display=tab==='borra'?'block':'none';
-  // Update filter pills color
+  
   document.querySelectorAll('#rel-filter-row .fpill.active').forEach(el=>{
     el.className=tab==='borra'?'fpill active-amber':'fpill active';
   });
   carregarRelatorio();
 }
-function setRelPeriodo(p,el){
+window.setRelPeriodo = function(p,el){
   relPeriodo=p;
   document.querySelectorAll('#rel-filter-row .fpill').forEach(x=>x.className='fpill');
   el.className=relTab==='borra'?'fpill active-amber':'fpill active';
   document.getElementById('custom-date-row').style.display=p==='custom'?'flex':'none';
   if(p!=='custom')carregarRelatorio();
 }
-function setRankPeriodo(p,el){
+window.setRankPeriodo = function(p,el){
   rankPeriodo=p;
   el.closest('.filter-row').querySelectorAll('.fpill').forEach(x=>x.className='fpill');
   el.className=relTab==='borra'?'fpill active-amber':'fpill active';
@@ -1314,7 +1417,7 @@ function getOrdens(periodo,all){
     return true;
   });
 }
-async function carregarRelatorio(){
+window.carregarRelatorio = async function(){
   const ordens=getOrdens(relPeriodo);
   const total=ordens.length;
   const receita=ordens.reduce((s,o)=>s+Number(o.valor||0),0);
@@ -1342,9 +1445,10 @@ function renderChartReceita(ordens){
   const border=relTab==='borra'?'rgba(245,158,11,1)':'rgba(41,182,246,1)';
   chartReceita=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Receita',data,backgroundColor:color,borderColor:border,borderWidth:2,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(106,157,191,.8)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'rgba(106,157,191,.8)',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}}}});
 }
+
 function renderRanking(ordens){
   const map={};
-  ordens.forEach(o=>{if(o.lavador)map[o.lavador]=(map[o.lavador]||0)+1;});
+  ordens.forEach(o=>{if(o.lavador && o.lavador !== 'Avulso') map[o.lavador]=(map[o.lavador]||0)+1;});
   const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
   const max=sorted[0]?sorted[0][1]:1;
   const el=document.getElementById('ranking-list');
@@ -1400,7 +1504,7 @@ function renderHistorico(ordens){
 // ════════════════════════════════════════
 // FINANCEIRO
 // ════════════════════════════════════════
-function setFinPeriodo(p,el){
+window.setFinPeriodo = function(p,el){
   finPeriodo=p;
   document.querySelectorAll('#fin-filter-row .fpill').forEach(x=>x.className='fpill');
   el.className='fpill active';
@@ -1408,7 +1512,7 @@ function setFinPeriodo(p,el){
   if(cr)cr.style.display=p==='custom'?'flex':'none';
   if(p!=='custom')renderFinanceiro();
 }
-function lancarGasto(){
+window.lancarGasto = function(){
   const cat=document.getElementById('fin-cat').value;
   const desc=document.getElementById('fin-desc').value.trim();
   const val=parseFloat(document.getElementById('fin-valor').value);
@@ -1424,7 +1528,7 @@ function lancarGasto(){
   toast('Gasto lançado!','ok');
   renderFinanceiro();
 }
-function renderFinanceiro(){
+window.renderFinanceiro = function(){
   const all=JSON.parse(localStorage.getItem('ordens_local')||'[]').filter(o=>o.status!=='cancelado');
   const gastos=JSON.parse(localStorage.getItem('gastos')||'[]');
   const ordFilt=filtrarPorPeriodo(finPeriodo,all);
@@ -1435,7 +1539,6 @@ function renderFinanceiro(){
   const margem=receita>0?((lucro/receita)*100):0;
   const ticketMed=ordFilt.length>0?(receita/ordFilt.length):0;
 
-  // Dias únicos com gastos para média diária
   const diasGasto=new Set(gasFilt.map(g=>new Date(g.criadoEm).toDateString())).size||1;
   const gastoMedDia=totalG/diasGasto;
 
@@ -1453,7 +1556,6 @@ function renderFinanceiro(){
   mEl.textContent=margem.toFixed(1)+'%';
   mEl.style.color=margem>=50?'#66bb6a':margem>=20?'#ffb800':'#ff5252';
 
-  // Gráfico rosca
   const catMap={};
   gasFilt.forEach(g=>{catMap[g.cat]=(catMap[g.cat]||0)+Number(g.valor||0);});
   if(chartGastos)chartGastos.destroy();
@@ -1469,7 +1571,6 @@ function renderFinanceiro(){
       }});
   }
 
-  // Distribuição % por categoria
   const distEl=document.getElementById('fin-dist-list');
   if(distEl){
     distEl.innerHTML='';
@@ -1493,7 +1594,6 @@ function renderFinanceiro(){
     }
   }
 
-  // Histórico
   const hEl=document.getElementById('fin-hist'); hEl.innerHTML='';
   if(!gasFilt.length){hEl.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Nenhum gasto lançado</p>';return;}
   gasFilt.slice(0,50).forEach(g=>{
@@ -1528,29 +1628,20 @@ function filtrarPorPeriodo(p,items){
 // ════════════════════════════════════════
 // SENHAS E SEGURANÇA (PIN DA GERÊNCIA E RESET)
 // ════════════════════════════════════════
-function pedirSenha(ctx){
+window.pedirSenha = function(ctx){
   senhaCtx=ctx;
-
-  if(ctx === 'reset' && window.__authUser) {
-     if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
-         localStorage.removeItem('ordens_local');
-         localStorage.removeItem('gastos');
-         filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
-     }
-     return;
-  }
-
   document.getElementById('senha-inp').value='';
-  document.getElementById('senha-desc').textContent=ctx==='fin'?'Digite o PIN para destravar':'Confirme o PIN para zerar o sistema';
+  document.getElementById('senha-titulo').textContent = ctx==='fin'?'Cofre da Gerência':'Zona de Perigo';
+  document.getElementById('senha-desc').textContent = ctx==='fin'?'Digite o PIN para destravar':'Confirme o PIN para zerar o sistema';
   document.getElementById('senha-modal').classList.add('open');
   setTimeout(()=>document.getElementById('senha-inp').focus(),200);
 }
 
-function fecharSenha(){
+window.fecharSenha = function(){
   document.getElementById('senha-modal').classList.remove('open');
 }
 
-function confirmarSenha(){
+window.confirmarSenha = function(){
   const inputPin = document.getElementById('senha-inp').value;
   
   if(inputPin !== senhaAdmin){
@@ -1568,13 +1659,15 @@ function confirmarSenha(){
     carregarRelatorio(); 
   }
   if(senhaCtx==='reset'){
-    localStorage.removeItem('ordens_local');
-    localStorage.removeItem('gastos');
-    filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
+    if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
+      localStorage.removeItem('ordens_local');
+      localStorage.removeItem('gastos');
+      filaCache=[]; renderFila(); toast('Sistema zerado com sucesso!','ok');
+    }
   }
 }
 
-function alterarSenhaAdmin(){
+window.alterarSenhaAdmin = function(){
   const atual=document.getElementById('cfg-senha-atual').value;
   const nova=document.getElementById('cfg-senha-nova').value.trim();
   
@@ -1602,18 +1695,18 @@ document.addEventListener('keydown',e=>{
 // ════════════════════════════════════════
 // CONFIG / TEMA
 // ════════════════════════════════════════
-function loadCfg(){
+window.loadCfg = function(){
   cfg=JSON.parse(localStorage.getItem('cfg')||'{"nome":"Lava Rápido Nova Onda","end":"Av Deli Lacerda N-888 Centro - Quaraçu","tel":"(77) 99937-7205"}');
   document.getElementById('cfg-nome').value=cfg.nome||'';
   document.getElementById('cfg-end').value=cfg.end||'';
   document.getElementById('cfg-tel').value=cfg.tel||'';
 }
-function salvarCfg(){
+window.salvarCfg = function(){
   cfg={nome:document.getElementById('cfg-nome').value.trim(),end:document.getElementById('cfg-end').value.trim(),tel:document.getElementById('cfg-tel').value.trim()};
   localStorage.setItem('cfg',JSON.stringify(cfg));
   toast('Configurações salvas!','ok');
 }
-function setTheme(theme,el){
+window.setTheme = function(theme,el){
   document.querySelectorAll('.theme-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   document.body.removeAttribute('data-theme');
@@ -1630,7 +1723,7 @@ function loadTheme(){
 // TOAST
 // ════════════════════════════════════════
 let toastT;
-function toast(msg,type=''){
+window.toast = function(msg,type=''){
   const el=document.getElementById('toast');
   el.textContent=msg;el.className=(type?type+' ':'')+'show';
   clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2800);
@@ -1646,11 +1739,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
   document.getElementById('pwa-install-banner').style.display = 'block'; 
 });
 
-function fecharInstall() {
+window.fecharInstall = function() {
   document.getElementById('pwa-install-banner').style.display = 'none';
 }
 
-async function instalarApp() {
+window.instalarApp = async function() {
   if (deferredPrompt) {
     fecharInstall();
     deferredPrompt.prompt(); 
@@ -1667,8 +1760,16 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════
-// INIT
+// INIT DO APLICATIVO E EXPOSIÇÃO GLOBAL
 // ════════════════════════════════════════
+window.setTab = setTab;
+window.setFinSubTab = setFinSubTab;
+window.trancarGerencia = trancarGerencia;
+window.toggleCam = toggleCam;
+window.addTipo = addTipo;
+window.fazerLoginApp = fazerLoginApp;
+window.sairDoApp = sairDoApp;
+
 loadTheme();
 renderLavadores();
 renderTipos();
@@ -1676,6 +1777,8 @@ renderBorraServs();
 renderVals('chips-vals');
 renderVals('chips-vals-borra');
 loadCfg();
+renderCfgLavLava();
+renderCfgLavBorra();
 renderCfgBorraServs();
 document.getElementById('novo-tipo').addEventListener('keydown',e=>{if(e.key==='Enter')addTipo();});
 </script>
