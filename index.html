@@ -17,6 +17,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, query, orderBy, limit, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 const firebaseConfig = {
   apiKey:"COLE_AQUI",authDomain:"COLE_AQUI",projectId:"COLE_AQUI",
   storageBucket:"COLE_AQUI",messagingSenderId:"COLE_AQUI",appId:"COLE_AQUI"
@@ -24,10 +27,25 @@ const firebaseConfig = {
 try {
   const app=initializeApp(firebaseConfig);
   const db=getFirestore(app);
+  const auth=getAuth(app);
+  
   window.__db=db;
-  window.__fns={collection,addDoc,updateDoc,doc,getDocs,query,orderBy,limit,serverTimestamp};
+  window.__auth=auth;
+  window.__fns={collection,addDoc,updateDoc,doc,getDocs,query,orderBy,limit,serverTimestamp, signInWithEmailAndPassword, signOut};
+  
   await getDocs(query(collection(db,'ordens'),orderBy('criadoEm','desc'),limit(1)));
   window.__fbOk=true;
+
+  // Fica escutando se o dono está logado ou não
+  onAuthStateChanged(auth, (user) => {
+    window.__authUser = user;
+    if(!user) {
+      const fl = document.getElementById('fin-locked');
+      const fc = document.getElementById('fin-content');
+      if(fl && fc) { fl.style.display='block'; fc.style.display='none'; }
+    }
+  });
+
 } catch(e){window.__fbOk=false;}
 window.dispatchEvent(new Event("firebase-ready"));
 </script>
@@ -182,7 +200,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
 
 /* Fila sub-tabs */
-.sub-tabs{display:flex;gap:0;margin-bottom:16px;border-radius:var(--rs);overflow:hidden;border:1px solid var(--border)}
+.sub-tabs{display:flex;gap:0;border-radius:var(--rs);overflow:hidden;border:1px solid var(--border)}
 .sub-tab{flex:1;padding:11px 8px;background:var(--glass);border:none;color:var(--muted);
   cursor:pointer;font-family:var(--fh);font-size:12px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;transition:all .2s;text-align:center}
@@ -458,9 +476,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 
   <div id="fin-content" style="display:none">
     
-    <div class="sub-tabs" style="margin-bottom:14px">
-      <button class="sub-tab active-lava" id="fin-tab-geral" onclick="setFinSubTab('geral')">💰 Financeiro</button>
-      <button class="sub-tab" id="fin-tab-rel" onclick="setFinSubTab('rel')">📊 Relatórios</button>
+    <div style="display:flex; gap:10px; margin-bottom:14px">
+      <div class="sub-tabs" style="margin:0; flex:1">
+        <button class="sub-tab active-lava" id="fin-tab-geral" onclick="setFinSubTab('geral')">💰 Financeiro</button>
+        <button class="sub-tab" id="fin-tab-rel" onclick="setFinSubTab('rel')">📊 Relatórios</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="sairGerencia()" style="color:#ff5252; border-color:rgba(255,82,82,0.3); padding:0 12px">Sair 🔒</button>
     </div>
 
     <div id="fin-geral-wrap">
@@ -568,13 +589,6 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
     <div class="ig"><label>Telefone</label><input id="cfg-tel" type="tel"/></div>
     <button class="btn btn-primary" onclick="salvarCfg()">💾 Salvar</button>
   </div>
-  
-  <div class="card">
-    <div class="card-title">🔐 Senha da Gerência</div>
-    <div class="ig"><label>Senha Atual</label><input id="cfg-senha-atual" type="password" placeholder="Digite a senha atual"/></div>
-    <div class="ig"><label>Nova Senha</label><input id="cfg-senha-nova" type="password" placeholder="Nova senha (mínimo 4 caracteres)"/></div>
-    <button class="btn btn-primary" onclick="alterarSenhaAdmin()">💾 Alterar Senha</button>
-  </div>
 
   <div class="card">
     <div class="card-title">Tema do App</div>
@@ -628,9 +642,18 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
   <div class="senha-box">
     <div style="font-size:40px;margin-bottom:10px">🔐</div>
     <h3>Acesso Restrito</h3>
-    <p id="senha-desc">Digite a senha para continuar</p>
-    <div class="ig"><input id="senha-inp" type="password" placeholder="••••••••••••"/></div>
-    <div style="display:flex;gap:8px">
+    <p id="senha-desc" style="margin-bottom:14px">Autenticação Firebase</p>
+    
+    <div class="ig">
+      <input id="login-email" type="email" value="lrbnovaonda@gmail.com" 
+      style="background:rgba(0,0,0,0.1); color:var(--accent); font-weight:bold; text-align:center" />
+    </div>
+    
+    <div class="ig">
+      <input id="senha-inp" type="password" placeholder="Sua senha..."/>
+    </div>
+    
+    <div style="display:flex;gap:8px; margin-top:16px">
       <button class="btn btn-ghost" onclick="fecharSenha()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmarSenha()">Entrar</button>
     </div>
@@ -641,10 +664,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 
 <script>
 // ════════════════════════════════════════
-// CONSTANTES E SENHA
+// CONSTANTES 
+// (A senha agora é gerenciada pelo Firebase)
 // ════════════════════════════════════════
-let senhaAdmin    = localStorage.getItem('senha_admin') || 'masternovaonda';
-
 const LAV_LAVA    = ['João Pedro','Litio','Samuel','Cleber','Glauber','Cleberson','Gustavo','Avulso'];
 const LAV_BORRA   = ['Andrei','João Pedro','Avulso'];
 const VALS_RAP    = [15,20,25,30,40,50,60,80,100,120,150,200];
@@ -682,11 +704,12 @@ function setDb(ok){
 // TABS E SUB-TABS
 // ════════════════════════════════════════
 function setTab(t){
-  // Tranca financeiro/relatório ao sair
+  // Tranca financeiro/relatório ao sair (apenas visualmente, a segurança real é no DB)
   if(t!=='financeiro'){
     document.getElementById('fin-locked').style.display='block';
     document.getElementById('fin-content').style.display='none';
   }
+  
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+t).classList.add('active');
@@ -696,6 +719,15 @@ function setTab(t){
   
   if(t==='fila')      carregarFila();
   if(t==='config')    {loadCfg();renderCfgTipos();}
+  if(t==='financeiro') {
+    // Se a sessão da Google já estiver ativa em segundo plano, entra direto
+    if(window.__authUser){
+      document.getElementById('fin-locked').style.display='none';
+      document.getElementById('fin-content').style.display='block';
+      renderFinanceiro();
+      carregarRelatorio();
+    }
+  }
 }
 
 function setFinSubTab(tab){
@@ -1378,41 +1410,78 @@ function filtrarPorPeriodo(p,items){
 }
 
 // ════════════════════════════════════════
-// SENHA E SEGURANÇA
+// SENHA (FIREBASE AUTH)
 // ════════════════════════════════════════
 function pedirSenha(ctx){
   senhaCtx=ctx;
+
+  // Se o dono já logou e só quer fazer o reset local, permite direto sem pedir senha de novo
+  if(ctx === 'reset' && window.__authUser) {
+     if(confirm('Tem certeza que deseja apagar todos os dados locais? Ação irreversível.')) {
+         localStorage.removeItem('ordens_local');
+         localStorage.removeItem('gastos');
+         filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
+     }
+     return;
+  }
+
   document.getElementById('senha-inp').value='';
-  document.getElementById('senha-desc').textContent=ctx==='fin'?'Área financeira — gerência':'Ação irreversível — confirme com a senha';
+  document.getElementById('senha-desc').textContent=ctx==='fin'?'Área financeira — gerência':'Confirme sua identidade para zerar o sistema';
   document.getElementById('senha-modal').classList.add('open');
   setTimeout(()=>document.getElementById('senha-inp').focus(),200);
 }
-function fecharSenha(){document.getElementById('senha-modal').classList.remove('open');}
-function confirmarSenha(){
-  if(document.getElementById('senha-inp').value!==senhaAdmin){toast('Senha incorreta','err');document.getElementById('senha-inp').value='';return;}
-  fecharSenha();
-  if(senhaCtx==='fin'){
-    document.getElementById('fin-locked').style.display='none';
-    document.getElementById('fin-content').style.display='block';
-    renderFinanceiro();
-    carregarRelatorio(); 
-  }
-  if(senhaCtx==='reset'){localStorage.removeItem('ordens_local');localStorage.removeItem('gastos');filaCache=[];renderFila();toast('Sistema zerado!','ok');}
+
+function fecharSenha(){
+  document.getElementById('senha-modal').classList.remove('open');
 }
 
-function alterarSenhaAdmin(){
-  const atual=document.getElementById('cfg-senha-atual').value;
-  const nova=document.getElementById('cfg-senha-nova').value.trim();
-  if(!atual||!nova){toast('Preencha os dois campos','err');return;}
-  if(atual!==senhaAdmin){toast('Senha atual incorreta','err');return;}
-  if(nova.length<4){toast('A nova senha deve ter no mínimo 4 caracteres','err');return;}
-  if(confirm('Deseja realmente alterar a senha de acesso à gerência?')){
-    senhaAdmin=nova;
-    localStorage.setItem('senha_admin',nova);
-    document.getElementById('cfg-senha-atual').value='';
-    document.getElementById('cfg-senha-nova').value='';
-    toast('Senha alterada com sucesso!','ok');
+async function confirmarSenha(){
+  const email = document.getElementById('login-email').value.trim();
+  const pwd = document.getElementById('senha-inp').value;
+
+  if(!email || !pwd){
+    toast('Preencha e-mail e senha','err'); 
+    return;
   }
+  
+  if(!window.__fbOk || !window.__auth || !window.__fns) {
+    toast('Conecte à internet primeiro!','err');
+    return;
+  }
+
+  document.getElementById('senha-inp').disabled = true;
+
+  try {
+    // Faz o login de verdade no servidor do Google
+    await window.__fns.signInWithEmailAndPassword(window.__auth, email, pwd);
+    
+    fecharSenha();
+    toast('Acesso liberado! ✅','ok');
+    
+    if(senhaCtx==='fin'){
+      document.getElementById('fin-locked').style.display='none';
+      document.getElementById('fin-content').style.display='block';
+      renderFinanceiro();
+      carregarRelatorio();
+    }
+    if(senhaCtx==='reset'){
+      localStorage.removeItem('ordens_local');
+      localStorage.removeItem('gastos');
+      filaCache=[]; renderFila(); toast('Sistema zerado!','ok');
+    }
+  } catch(e) {
+    console.error(e);
+    toast('Senha incorreta!','err');
+  } finally {
+    document.getElementById('senha-inp').disabled = false;
+    document.getElementById('senha-inp').value = '';
+  }
+}
+
+function sairGerencia(){
+  if(window.__auth) window.__fns.signOut(window.__auth);
+  toast('Sessão da gerência encerrada 🔒','ok');
+  setTab('nova'); // Expulsa o usuário de volta pra tela de criar OS
 }
 
 document.addEventListener('keydown',e=>{
