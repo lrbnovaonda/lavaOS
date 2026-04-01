@@ -37,7 +37,6 @@ try {
   
   window.__db=db;
   window.__auth=auth;
-  // Adicionado o deleteDoc aqui para podermos apagar dados da nuvem
   window.__fns={collection,addDoc,updateDoc,deleteDoc,doc,getDocs,query,orderBy,limit,serverTimestamp, signInWithEmailAndPassword, signOut};
   
   await getDocs(query(collection(db,'ordens'),orderBy('criadoEm','desc'),limit(1)));
@@ -1120,6 +1119,7 @@ window.remLavBorra=function(t){
   saveLavadores();renderLavadores();renderCfgLavBorra();
 }
 
+
 // ════════════════════════════════════════
 // TIPOS LAVAGEM E SERVIÇOS
 // ════════════════════════════════════════
@@ -1318,6 +1318,14 @@ async function abrirOS(tipo){
 
   if(fbOk&&db&&fns){
     fns.addDoc(fns.collection(db,'ordens'),{...os,criadoEm:fns.serverTimestamp()})
+      .then(docRef => {
+          // Atualiza a OS local com a ID que o Firebase gerou (fundamental para o Cancelar na nuvem funcionar)
+          const loc = JSON.parse(localStorage.getItem('ordens_local')||'[]');
+          const idx = loc.findIndex(o => o.numero === os.numero);
+          if(idx >= 0) { loc[idx].id = docRef.id; localStorage.setItem('ordens_local', JSON.stringify(loc)); }
+          const fIdx = filaCache.findIndex(o => o.numero === os.numero);
+          if(fIdx >= 0) { filaCache[fIdx].id = docRef.id; }
+      })
       .catch(e=>console.warn('FB:',e.message));
   }
 
@@ -1452,7 +1460,7 @@ function renderFila(){
   });
 }
 
-window.finalizarOS = function(numero,event){
+window.finalizarOS = async function(numero,event){
   event.stopPropagation();
   const idx=filaCache.findIndex(o=>o.numero===numero);
   if(idx<0)return;
@@ -1460,32 +1468,62 @@ window.finalizarOS = function(numero,event){
   const local=JSON.parse(localStorage.getItem('ordens_local')||'[]');
   const li=local.findIndex(o=>o.numero===numero);
   if(li>=0){local[li].status='concluido';localStorage.setItem('ordens_local',JSON.stringify(local));}
-  if(fbOk&&db&&fns&&filaCache[idx].id){
-    fns.updateDoc(fns.doc(db,'ordens',filaCache[idx].id),{status:'concluido'}).catch(e=>console.warn(e));
+  
+  if(fbOk&&db&&fns){
+    if(filaCache[idx].id) {
+       fns.updateDoc(fns.doc(db,'ordens',filaCache[idx].id),{status:'concluido'}).catch(e=>console.warn(e));
+    } else {
+       // Se o ID ainda não chegou da nuvem, varre a nuvem rápido pra tentar finalizar
+       const snap = await fns.getDocs(fns.query(fns.collection(db,'ordens'), fns.limit(30)));
+       snap.forEach(d => { if(d.data().numero === numero) fns.updateDoc(fns.doc(db,'ordens',d.id),{status:'concluido'}); });
+    }
   }
   renderFila(); toast('OS concluída! ✅','ok');
 }
 
+// O BUG DO CANCELAR FOI CORRIGIDO AQUI:
 window.pedirCancelar = function(numero,event){
   event.stopPropagation();
-  cancelPendingNum=numero;
+  cancelPendingNum=numero; // A gente memoriza a OS
   document.getElementById('confirm-modal').classList.add('open');
 }
-window.fecharConfirm = function(){document.getElementById('confirm-modal').classList.remove('open');cancelPendingNum=null;}
-window.confirmarCancelar = function(){
-  fecharConfirm();
-  if(!cancelPendingNum)return;
-  const numero=cancelPendingNum; cancelPendingNum=null;
+
+window.fecharConfirm = function(){
+  document.getElementById('confirm-modal').classList.remove('open');
+  cancelPendingNum=null; // Ele zera a memória ao fechar a janela
+}
+
+window.confirmarCancelar = async function(){
+  // Pega o número da memória ANTES da janela fechar e apagar tudo!
+  const numero = cancelPendingNum; 
+  window.fecharConfirm(); 
+  
+  if(!numero) return; 
+
   const idx=filaCache.findIndex(o=>o.numero===numero);
   if(idx<0)return;
+  
   filaCache[idx].status='cancelado';
+  
   const local=JSON.parse(localStorage.getItem('ordens_local')||'[]');
   const li=local.findIndex(o=>o.numero===numero);
-  if(li>=0){local[li].status='cancelado';localStorage.setItem('ordens_local',JSON.stringify(local));}
-  if(fbOk&&db&&fns&&filaCache[idx].id){
-    fns.updateDoc(fns.doc(db,'ordens',filaCache[idx].id),{status:'cancelado'}).catch(e=>console.warn(e));
+  if(li>=0){
+     local[li].status='cancelado';
+     localStorage.setItem('ordens_local',JSON.stringify(local));
   }
-  filaCache.splice(idx,1); renderFila();
+  
+  if(fbOk&&db&&fns){
+     if(filaCache[idx].id){
+        fns.updateDoc(fns.doc(db,'ordens',filaCache[idx].id),{status:'cancelado'}).catch(e=>console.warn(e));
+     } else {
+        // Rede de segurança: procura e deleta caso a net tenha piscado
+        const snap = await fns.getDocs(fns.query(fns.collection(db,'ordens'), fns.limit(30)));
+        snap.forEach(d => { if(d.data().numero === numero) fns.updateDoc(fns.doc(db,'ordens',d.id),{status:'cancelado'}); });
+     }
+  }
+  
+  filaCache.splice(idx,1); 
+  renderFila();
   toast('OS cancelada — não afeta o financeiro','ok');
 }
 
@@ -1619,7 +1657,7 @@ function renderHistorico(ordens){
   if(!sorted.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Nenhuma OS</p>';return;}
   el.innerHTML='';
   sorted.forEach(os=>{
-    const dt=new Date(os.criadoEm?.toDate?o.criadoEm.toDate():os.criadoEm);
+    const dt=new Date(os.criadoEm?.toDate?os.criadoEm.toDate():os.criadoEm);
     if(isNaN(dt)) return;
     const data=dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
     const hora=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -1653,7 +1691,15 @@ window.lancarGasto = function(){
   const gastos=JSON.parse(localStorage.getItem('gastos')||'[]');
   gastos.unshift(gasto);
   localStorage.setItem('gastos',JSON.stringify(gastos.slice(0,500)));
-  if(fbOk&&db&&fns){fns.addDoc(fns.collection(db,'gastos'),{...gasto,criadoEm:fns.serverTimestamp()}).catch(e=>console.warn(e));}
+  if(fbOk&&db&&fns){
+      fns.addDoc(fns.collection(db,'gastos'),{...gasto,criadoEm:fns.serverTimestamp()})
+      .then(docRef => {
+          const ls = JSON.parse(localStorage.getItem('gastos')||'[]');
+          const li = ls.findIndex(g => g.desc === gasto.desc && g.valor === gasto.valor);
+          if(li >= 0) { ls[li].id = docRef.id; localStorage.setItem('gastos', JSON.stringify(ls)); }
+      })
+      .catch(e=>console.warn(e));
+  }
   document.getElementById('fin-desc').value='';
   document.getElementById('fin-valor').value='';
   toast('Gasto lançado!','ok');
@@ -1799,7 +1845,6 @@ window.confirmarSenha = async function(){
     if(confirm('Tem certeza que deseja APAGAR TUDO na nuvem e no celular? Ação IRREVERSÍVEL.')) {
       toast('Apagando nuvem... aguarde.','');
       
-      // APAGA TUDO NO FIREBASE
       if(fbOk && db && fns && fns.deleteDoc) {
          try {
             const snapOrdens = await fns.getDocs(fns.collection(db, 'ordens'));
@@ -1810,7 +1855,6 @@ window.confirmarSenha = async function(){
          } catch(err) { console.error(err); }
       }
 
-      // APAGA TUDO NO CELULAR
       localStorage.removeItem('ordens_local');
       localStorage.removeItem('gastos');
       localStorage.removeItem('os_seq');
